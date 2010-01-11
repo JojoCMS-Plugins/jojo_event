@@ -19,9 +19,33 @@ $_provides['pluginClasses'] = array(
 $_options[] = array(
     'id' => 'upcomingevents_num',
     'category' => 'Events',
-    'label' => 'Number of events',
+    'label'     => 'Number of events',
     'description' => 'The number of upcoming events to show in the sidebar',
-    'type' => 'integer',
-    'default' => '5',
-    'options' => ''
+    'type'      => 'integer',
+    'default'   => '5',
+    'options'  => '',
+    'plugin'    => 'jojo_event'
+);
+
+
+$_options[] = array(
+    'id' => 'upcomingevents_dateformat',
+    'category' => 'Events',
+    'label' => 'Date Format',
+    'description' => 'Date display format',
+    'type' => 'text',
+    'default' => '%d %b',
+    'options' => '',
+    'plugin'      => 'jojo_event'
+);
+
+$_options[] = array(
+    'id'          => 'noevent_description',
+    'category'    => 'Events',
+    'label'       => 'No events text',
+    'description' => 'Text to show when no upcoming events listed',
+    'type'        => 'textarea',
+    'default'     => 'There are currently no upcoming events, please check back later.',
+    'options'     => '',
+    'plugin'      => 'jojo_event'
 );

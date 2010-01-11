@@ -27,10 +27,14 @@ class JOJO_Plugin_Jojo_event extends JOJO_Plugin
         $content = array();
 
         $events = JOJO::selectQuery("SELECT {event}.*, date_format( from_unixtime( startdate ) , '%M %Y' ) as month FROM {event} WHERE enddate >= ? ORDER BY startdate", strtotime('TODAY'));
-        foreach ($events as $i => $e){
-            $events[$i]['startdateshort'] = strftime( '%d %b', $e['startdate']);
-            $events[$i]['enddateshort'] = strftime( '%d %b', $e['enddate']);
-            $events[$i]['title'] = htmlspecialchars($e['title'], ENT_COMPAT, 'UTF-8', false);
+        if (!empty($events)) {
+            foreach ($events as $i => $e){
+                $events[$i]['startdateshort'] = strftime( '%d %b', $e['startdate']);
+                $events[$i]['enddateshort'] = strftime( '%d %b', $e['enddate']);
+                $events[$i]['title'] = htmlspecialchars($e['title'], ENT_COMPAT, 'UTF-8', false);
+            }
+        } else {
+            $smarty->assign('noevent', Jojo::getOption('noevent_description', 'There are currently no upcoming events, please check back later.'));
         }
         $smarty->assign('events', $events);
         $smarty->assign('content', $this->page['pg_body']);

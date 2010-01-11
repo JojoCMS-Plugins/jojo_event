@@ -21,10 +21,15 @@ $table = 'event';
 $query = "
         CREATE TABLE {event} (
   `eventid` int(11) NOT NULL auto_increment,
+  `title` varchar(255) NOT NULL,
   `startdate` bigint(20) NOT NULL,
   `enddate` bigint(20) default NULL,
-  `title` varchar(255) NOT NULL,
+  `starttime` varchar(255) NOT NULL,
   `location` varchar(255) NOT NULL,
+  `locationaddress` varchar(255) NOT NULL,
+  `locationurl` varchar(255) NOT NULL,
+  `locationmaplink` varchar(255) NOT NULL,
+  `contactemail` varchar(255) NOT NULL,
   `description` text NOT NULL,
   `description_code` text NULL,
   `event_image` varchar(255) NOT NULL,

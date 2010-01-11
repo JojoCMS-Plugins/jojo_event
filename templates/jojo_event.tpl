@@ -16,10 +16,11 @@
     </p>
   {$event.description}
 {if $event.url}<p class="note">For more info see: <a href="{$event.url}">{$event.url|truncate:50}</a></p>{/if}
+{if $event.contactemail}<p class="note">Contact: <a href="mailto:{$event.contactemail}">{$event.contactemail}</a></p>{/if}
 
 
 {/foreach}
 {else}
-<p>There are currently no upcoming events, please check back later.</p>
+<p>{if $noevent}{$noevent}{else}There are currently no upcoming events, please check back later.{/if}</p>
 {/if}
 </div>

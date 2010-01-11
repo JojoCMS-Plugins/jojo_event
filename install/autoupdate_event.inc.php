@@ -44,13 +44,40 @@ $default_fd[$table][$field]['fd_required'] = 'yes';
 $default_fd[$table][$field]['fd_size']     = '50';
 $default_fd[$table][$field]['fd_help']     = 'The event name';
 
-/* Event Location */
+/* Event Location Name */
 $field = 'location';
 $default_fd[$table][$field]['fd_order']    = $o++;
+$default_fd[$table][$field]['fd_name']     = 'Location Name';
 $default_fd[$table][$field]['fd_type']     = 'text';
 $default_fd[$table][$field]['fd_required'] = 'no';
 $default_fd[$table][$field]['fd_size']     = '50';
-$default_fd[$table][$field]['fd_help']     = 'The event location';
+$default_fd[$table][$field]['fd_help']     = 'The event location name';
+
+/* Event Location Map link */
+$field = 'locationaddress';
+$default_fd[$table][$field]['fd_order']    = $o++;
+$default_fd[$table][$field]['fd_name']     = 'Location Address';
+$default_fd[$table][$field]['fd_type']     = 'text';
+$default_fd[$table][$field]['fd_required'] = 'no';
+$default_fd[$table][$field]['fd_size']     = '50';
+$default_fd[$table][$field]['fd_help']     = 'The event location address';
+
+/* Location URL */
+$field = 'locationurl';
+$default_fd[$table][$field]['fd_order']    = $o++;
+$default_fd[$table][$field]['fd_type']     = 'url';
+$default_fd[$table][$field]['fd_name']     = 'Location Weblink';
+$default_fd[$table][$field]['fd_required'] = 'no';
+$default_fd[$table][$field]['fd_size']     = '30';
+$default_fd[$table][$field]['fd_help']     = 'Web link for more information about the location';
+
+/* Event Location Map link */
+$field = 'locationmaplink';
+$default_fd[$table][$field]['fd_order']    = $o++;
+$default_fd[$table][$field]['fd_type']     = 'url';
+$default_fd[$table][$field]['fd_required'] = 'no';
+$default_fd[$table][$field]['fd_size']     = '50';
+$default_fd[$table][$field]['fd_help']     = 'The event location map link';
 
 /* URL */
 $field = 'url';
@@ -60,6 +87,16 @@ $default_fd[$table][$field]['fd_name']     = 'More info link';
 $default_fd[$table][$field]['fd_required'] = 'no';
 $default_fd[$table][$field]['fd_size']     = '30';
 $default_fd[$table][$field]['fd_help']     = 'Web link for more information';
+
+/* Email contact */
+$field = 'contactemail';
+$default_fd[$table][$field]['fd_name']     = 'Contact email link';
+$default_fd[$table][$field]['fd_order']    = $o++;
+$default_fd[$table][$field]['fd_type']     = 'email';
+$default_fd[$table][$field]['fd_required'] = 'no';
+$default_fd[$table][$field]['fd_size']     = '50';
+$default_fd[$table][$field]['fd_help']     = 'Email address (for bookings etc)';
+
 
 // Start Date Field
 $default_fd['event']['startdate'] = array(
@@ -80,6 +117,16 @@ $default_fd['event']['enddate'] = array(
         'fd_order' => $o++,
         'fd_mode' => "standard",
     );
+
+/* Event Location */
+$field = 'starttime';
+$default_fd[$table][$field]['fd_order']    = $o++;
+$default_fd[$table][$field]['fd_name']     = 'Start Time';
+$default_fd[$table][$field]['fd_type']     = 'text';
+$default_fd[$table][$field]['fd_required'] = 'no';
+$default_fd[$table][$field]['fd_size']     = '20';
+$default_fd[$table][$field]['fd_help']     = 'The time the event begins';
+
 
 // Description Code
 $default_fd['event']['description_code'] = array(
