@@ -30,10 +30,16 @@ $query = "
   `locationurl` varchar(255) NOT NULL,
   `locationmaplink` varchar(255) NOT NULL,
   `contactemail` varchar(255) NOT NULL,
+  `snippet` text NOT NULL,
   `description` text NOT NULL,
   `description_code` text NULL,
   `event_image` varchar(255) NOT NULL,
   `url` varchar(255) default NULL,
+  `category` int(11) default NULL,  
+  `language` varchar(100) NOT NULL default 'en',
+  `seotitle` varchar(255) NOT NULL default '',
+  `dateadded` int(11) default '0',
+  `tags` varchar(10) default NULL,
   PRIMARY KEY  (`eventid`),
   KEY `date` (`startdate`),
       FULLTEXT KEY `title` (`title`),
@@ -57,7 +63,28 @@ if (isset($result['added'])) {
 if (isset($result['different'])) Jojo::printTableDifference($table,$result['different']);
 
 
-/* For legacy text - make a copy of all HTML content into the article bbbody field, adding the editor tag to mark it as html */
-$bbhead = "[editor:html]\n";
-$num = Jojo::updateQuery("UPDATE {event} SET description_code=CONCAT(?, '<p>', description, '</p>') WHERE description_code IS NULL AND description!=''", array($bbhead));
-if ($num) echo "Copy event content to texteditor field - $num $table records affected.";
+$table = 'eventcategory';
+$query = "
+    CREATE TABLE {eventcategory} (
+      `eventcategoryid` int(11) NOT NULL auto_increment,
+      `ec_url` varchar(255) NOT NULL default '',
+      `sortby` enum('title asc','startdate asc','enddate asc') NOT NULL default 'startdate asc',
+      `ec_pageid` int(11) NOT NULL default '0',
+      PRIMARY KEY  (`eventcategoryid`)
+    ) TYPE=MyISAM ;";
+
+/* Check table structure */
+$result = Jojo::checkTable($table, $query);
+
+/* Output result */
+if (isset($result['created'])) {
+    echo sprintf("jojo_event: Table <b>%s</b> Does not exist - created empty table.<br />", $table);
+}
+
+if (isset($result['added'])) {
+    foreach ($result['added'] as $col => $v) {
+        echo sprintf("jojo_event: Table <b>%s</b> column <b>%s</b> Does not exist - added.<br />", $table, $col);
+    }
+}
+
+if (isset($result['different'])) Jojo::printTableDifference($table, $result['different']);
