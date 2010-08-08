@@ -62,6 +62,17 @@ $_options[] = array(
 );
 
 $_options[] = array(
+    'id'          => 'event_meta_description',
+    'category'    => 'Events',
+    'label'       => 'Dynamic meta description',
+    'description' => 'A dynamically built meta description template which will assist with SEO. Variables to use are [title], [site], [body].',
+    'type'        => 'textarea',
+    'default'     => '[title] - [body]...',
+    'options'     => '',
+    'plugin'      => 'jojo_event'
+);
+
+$_options[] = array(
     'id'          => 'eventsperpage',
     'category'    => 'Events',
     'label'       => 'Events per page on index',
@@ -172,72 +183,3 @@ if (class_exists('Jojo_Plugin_Jojo_Tags')) {
         'plugin'      => 'jojo_event'
     );
 }
-
-/* RSS */
-
-$_options[] = array(
-    'id'          => 'event_rss_showlink',
-    'category'    => 'RSS',
-    'label'       => 'RSS link on Event index',
-    'description' => 'Shows a link to the RSS feed at the top of each event index',
-    'type'        => 'radio',
-    'default'     => 'no',
-    'options'     => 'yes,no',
-    'plugin'      => 'jojo_event'
-);
-
-$_options[] = array(
-    'id'          => 'event_external_rss',
-    'category'    => 'RSS',
-    'label'       => 'External Event RSS URL',
-    'description' => 'The external URL (eg Feedburner) for the Event RSS feed (leave blank to use the Jojo defaults)',
-    'type'        => 'text',
-    'default'     => '',
-    'options'     => '',
-    'plugin'      => 'jojo_event'
-);
-
-$_options[] = array(
-    'id'          => 'event_rss_num_events',
-    'category'    => 'RSS',
-    'label'       => 'Number of RSS events',
-    'description' => 'The number of events to be displayed in the RSS feed (more events will use more bandwidth))',
-    'type'        => 'integer',
-    'default'     => '15',
-    'options'     => '',
-    'plugin'      => 'jojo_event'
-);
-
-$_options[] = array(
-    'id'          => 'event_full_rss_description',
-    'category'    => 'RSS',
-    'label'       => 'Full Event RSS Description',
-    'description' => 'If YES, a full copy of the event is provided in the RSS feed. If NO, the RSS feed only includes content before the snip filter tag.',
-    'type'        => 'radio',
-    'default'     => 'yes',
-    'options'     => 'yes,no',
-    'plugin'      => 'jojo_event'
-);
-
-$_options[] = array(
-    'id'          => 'event_rss_truncate',
-    'category'    => 'RSS',
-    'label'       => 'Event RSS default truncation',
-    'description' => 'If Full Description is set to No above, truncate events with no embedded snip filter tag to this length',
-    'type'        => 'integer',
-    'default'     => '800',
-    'options'     => '',
-    'plugin'      => 'jojo_event'
-);
-
-
-$_options[] = array(
-    'id'          => 'event_feed_source_link',
-    'category'    => 'RSS',
-    'label'       => 'Append source link to RSS feed',
-    'description' => 'Appends a source link to the bottom of the event in the RSS feed. This is to ensure scraper sites are providing a link back to the original event.',
-    'type'        => 'radio',
-    'default'     => 'yes',
-    'options'     => 'yes,no',
-    'plugin'      => 'jojo_event'
-);

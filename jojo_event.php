@@ -199,11 +199,9 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
                 'body' => 'description',
                 'url' => 'url',
                 'date' => 'date',
-                'datetype' => 'unix',
-                'snip' => (Jojo::getOption('event_full_rss_description') == 'yes' ? 'full' : Jojo::getOption('event_rss_truncate', 800)),
-                'sourcelink' => (boolean)(Jojo::getOption('event_feed_source_link') == 'yes')
+                'datetype' => 'unix'
             );
-            $events = array_slice($events, 0, Jojo::getOption('event_rss_num_events', 15));
+            $events = array_slice($events, 0, Jojo::getOption('rss_num_items', 15));
             Jojo::getFeed($events, $rssfields);
         }        
         
@@ -276,7 +274,7 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
             $content['title']            = $event['title'];
             $content['seotitle']         = $event['seotitle'];
             $content['breadcrumbs']      = $breadcrumbs;
-            $meta_description_template = Jojo::getOption('event_meta_description', '[event] - [body]...');
+            $meta_description_template = Jojo::getOption('event_meta_description', '[title] - [body]...');
             $metabody = (strlen($event['bodyplain']) >400) ?  substr($mbody=wordwrap($event['bodyplain'], 400, '$$'), 0, strpos($mbody,'$$')) : $event['bodyplain'];
             $metafilters = array(
                     '[title]', 
@@ -734,7 +732,7 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
     static function rssicon($data)
     {
         global $page;
-        $link = Jojo::getOption('event_external_rss');
+        $link = Jojo::getOption('rss_external_url');
         if ($link) {
             $data['Events'] =  $link;
         }
