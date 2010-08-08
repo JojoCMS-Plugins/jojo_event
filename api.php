@@ -12,12 +12,11 @@
  */
 
 $_provides['pluginClasses'] = array(
-        'JOJO_Plugin_Jojo_event' => 'Events - Listing and View',
-        'Jojo_Plugin_Jojo_event_rss'   => 'Events - RSS Feed',
+        'Jojo_Plugin_Jojo_event' => 'Events - Listing and View',
         );
 
 /* Register URI handlers */
-Jojo::registerURI(null, 'JOJO_Plugin_Jojo_event', 'isUrl');
+Jojo::registerURI(null, 'jojo_plugin_jojo_event', 'isUrl');
 
 /* Sitemap filter */
 Jojo::addFilter('jojo_sitemap', 'sitemap', 'jojo_event');
@@ -34,6 +33,10 @@ Jojo::addFilter('rssicon', 'rssicon', 'jojo_event');
 
 /* Content Filter */
 Jojo::addFilter('content', 'removesnip', 'jojo_event');
+
+/* capture the button press in the admin section */
+Jojo::addHook('admin_action_after_save_page', 'admin_action_after_save_page', 'jojo_event');
+Jojo::addHook('admin_action_after_save_eventcategory', 'admin_action_after_save_eventcategory', 'jojo_event');
 
 
 $_options[] = array(
@@ -66,17 +69,6 @@ $_options[] = array(
     'type'        => 'integer',
     'default'     => '40',
     'options'     => '',
-    'plugin'      => 'jojo_event'
-);
-
-$_options[] = array(
-    'id'          => 'event_enable_categories',
-    'category'    => 'Events',
-    'label'       => 'Event Categories',
-    'description' => 'Allows multiple event collections by category under their own URLs',
-    'type'        => 'radio',
-    'default'     => 'no',
-    'options'     => 'yes,no',
     'plugin'      => 'jojo_event'
 );
 

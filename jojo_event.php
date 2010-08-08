@@ -17,65 +17,145 @@
  * @link    http://www.jojocms.org JojoCMS
  */
 
-class JOJO_Plugin_Jojo_event extends JOJO_Plugin
+class Jojo_Plugin_Jojo_event extends Jojo_Plugin
 {
 
     /* Gets $num items sorted by startdate (asc) for use on homepages and sidebars */
-    static function getItems($num, $start = 0, $categoryid='all', $sortby=false, $exclude=false, $usemultilanguage=true) {
+    static function getItems($num=false, $start = 0, $categoryid='all', $sortby='startdate asc', $exclude=false, $include=false) {
         global $page;
-        if (_MULTILANGUAGE) $language = !empty($page->page['pg_language']) ? $page->page['pg_language'] : Jojo::getOption('multilanguage-default', 'en');
-        $_CATEGORIES      = (Jojo::getOption('event_enable_categories', 'no') == 'yes') ? true : false;
-        /* if calling page is an event, Get current id, and exclude from the list  */
-        $excludethisid = ($exclude && Jojo::getOption('event_sidebar_exclude_current', 'no')=='yes' && $page->page['pg_link']=='jojo_plugin_jojo_event' && Jojo::getFormData('id')) ? Jojo::getFormData('id') : '';
-
-        $now    = strtotime('TODAY');
-        $query  = "SELECT ev.*, date_format( from_unixtime( ev.startdate ) , '%M %Y' ) as month ";
-        $query .= $_CATEGORIES ? ", c.ec_url, p.pg_menutitle, p.pg_title" : '';
-        $query .= " FROM {event} ev";
-        $query .= $_CATEGORIES ? " LEFT JOIN {eventcategory} c ON (ev.category=c.eventcategoryid) LEFT JOIN {page} p ON (c.ec_url=p.pg_url)" : '';
-        $query .= " WHERE enddate>$now";
-        $query .= (_MULTILANGUAGE && $usemultilanguage) ? " AND (language = '$language')" : '';
-        $query .= ($_CATEGORIES && _MULTILANGUAGE && $usemultilanguage) ? " AND (pg_language = '$language')" : '';
-        $query .= ($_CATEGORIES && $categoryid && $categoryid!='all') ? " AND (category = '$categoryid')" : '';
-        $query .= $excludethisid ? " AND (eventid != '$excludethisid')" : '';
-        $query .= " ORDER BY " . ($sortby ? $sortby : "startdate ASC");
-        $query .= $num ? " LIMIT $start,$num" : '';
-        $events = Jojo::selectQuery($query);
-        foreach ($events as &$a){
-            $a['id']           = $a['eventid'];
-            $a['title']        = htmlspecialchars($a['title'], ENT_COMPAT, 'UTF-8', false);
-            $a['seotitle']        = isset($a['seotitle']) ? htmlspecialchars($a['seotitle'], ENT_COMPAT, 'UTF-8', false): $a['title'];
-            $a['cleandescription']    = strip_tags($a['description']);
-            $a['itemurl']          = self::getUrl($a['eventid'], $a['title'], $a['language'], ($_CATEGORIES ? $a['category'] : '') );
-            $a['category']     = ($_CATEGORIES && !empty($a['pg_menutitle'])) ? $a['pg_menutitle'] : $a['pg_title'];
-            $a['categoryurl']  = ($_CATEGORIES && !empty($a['ec_url'])) ? (_MULTILANGUAGE ? Jojo::getMultiLanguageString ($language, true) : '') . $a['ec_url'] . '/' : '';
-            $a['fstartdate'] = strftime( Jojo::getOption('upcomingevents_dateformat', '%d %b'), $a['startdate']);
-            $a['fenddate'] = strftime( Jojo::getOption('upcomingevents_dateformat', '%d %b'), $a['enddate']);
+        $now = time();
+        $language = _MULTILANGUAGE ? (!empty($page->page['pg_language']) ? $page->page['pg_language'] : Jojo::getOption('multilanguage-default', 'en')) : '';
+        if (is_array($categoryid)) {
+             $categoryquery = " AND category IN ('" . implode("','", $categoryid) . "')";
+        } else {
+            $categoryquery = is_numeric($categoryid) ? " AND category = '$categoryid'" : '';
         }
-        return $events;
+        /* if calling page is an event, Get current event, exclude from the list and up the limit by one */
+        $exclude = ($exclude && Jojo::getOption('event_sidebar_exclude_current', 'no')=='yes' && $page->page['pg_link']=='jojo_plugin_jojo_event' && Jojo::getFormData('id')) ? Jojo::getFormData('id') : '';
+        if ($num && $exclude) $num++;
+        $query  = "SELECT e.*, date_format( from_unixtime( e.startdate ) , '%M %Y' ) as month, c.*, p.pageid, pg_menutitle, pg_title, pg_url, pg_status, pg_language";
+        $query .= " FROM {event} e";
+        $query .= " LEFT JOIN {eventcategory} c ON (e.category=c.eventcategoryid) LEFT JOIN {page} p ON (c.pageid=p.pageid)";
+        $query .= " WHERE 1" . $categoryquery;
+        $query .= " AND enddate>$now";
+        $query .= (_MULTILANGUAGE && $categoryid == 'all' && $include != 'alllanguages') ? " AND (pg_language = '$language')" : '';
+        $query .= $num ? " ORDER BY $sortby LIMIT $start,$num" : '';
+        $items = Jojo::selectQuery($query);
+        $items = self::cleanItems($items, $exclude);
+        if (!$num)  $items = self::sortItems($items, $sortby);
+        return $items;
     }
 
-    static function getUrl($id=false, $title=false, $language=false, $categoryid=false)
+    static function getItemsById($ids = false, $sortby='startdate') {
+        $query  = "SELECT e.*, c.*, p.pageid, pg_menutitle, pg_title, pg_url, pg_status, pg_language";
+        $query .= " FROM {event} e";
+        $query .= " LEFT JOIN {eventcategory} c ON (e.category=c.eventcategoryid) LEFT JOIN {page} p ON (c.pageid=p.pageid)";
+        $query .=  is_array($ids) ? " WHERE eventid IN ('". implode("',' ", $ids) . "')" : " WHERE eventid=$ids";
+        $items = Jojo::selectQuery($query);
+        $items = self::cleanItems($items);
+        $items = is_array($ids) ? self::sortItems($items, $sortby) : $items[0];
+        return $items;
+    }
+
+    /* clean items for output */
+    static function cleanItems($items, $exclude=false) {
+        global $_USERGROUPS;
+        $now    = time();
+        $pagePermissions = new JOJO_Permissions();
+        foreach ($items as $k=>&$i){
+            $pagePermissions->getPermissions('page', $i['pageid']);
+            if (!$pagePermissions->hasPerm($_USERGROUPS, 'view') || $i['enddate']<$now || (!empty($i['eventid']) && $i['eventid']==$exclude) || $i['pg_status']=='inactive') {
+                unset($items[$k]);
+                continue;
+            }
+            $i['id']           = $i['eventid'];
+            $i['title']        = htmlspecialchars($i['title'], ENT_COMPAT, 'UTF-8', false);
+            $i['seotitle']        = isset($i['seotitle']) ? htmlspecialchars($i['seotitle'], ENT_COMPAT, 'UTF-8', false): $i['title'];
+            // Snip for the index description
+            $i['bodyplain'] = array_shift(Jojo::iExplode('[[snip]]', $i['description']));
+            /* Strip all tags and template include code ie [[ ]] */
+            $i['bodyplain'] = preg_replace('/\[\[.*?\]\]/', '',  trim(strip_tags($i['bodyplain'])));
+            $i['locationmaplink']    = htmlspecialchars($i['locationmaplink'], ENT_COMPAT, 'UTF-8', false);
+            $i['fstartdate'] = strftime( Jojo::getOption('upcomingevents_dateformat', '%d %b'), $i['startdate']);
+            $i['fenddate'] = strftime( Jojo::getOption('upcomingevents_dateformat', '%d %b'), $i['enddate']);
+            $i['image'] = !empty($i['event_image']) ? 'events/' . $i['event_image'] : '';
+            $i['url']          = self::getUrl($i['eventid'], '', $i['title'], $i['language'], $i['category']);
+            $i['date']       = $i['dateadded'];
+            $i['pagetitle'] = !empty($i['pg_menutitle']) ? htmlspecialchars($i['pg_menutitle'], ENT_COMPAT, 'UTF-8', false) : htmlspecialchars($i['pg_title'], ENT_COMPAT, 'UTF-8', false);
+            $i['pageurl']   = (_MULTILANGUAGE ? Jojo::getMultiLanguageString ($i['pg_language'], true) : '') . (!empty($i['pg_url']) ? $i['pg_url'] : $i['pageid'] . '/' .  Jojo::cleanURL($i['pg_title'])) . '/';
+            $i['plugin']     = 'jojo_event';
+            unset($items[$k]['description_code']);
+        }
+        return $items;
+    }
+
+    /* sort items for output */
+    static function sortItems($items, $sortby=false) {
+        if ($sortby) {
+            $order = "startdate";
+            $reverse = false;
+            switch ($sortby) {
+              case "startdate asc":
+                $order="startdate";
+                break;
+              case "enddate asc":
+                $order="enddate";
+                break;
+              case "title asc":
+                $order="title";
+                break;
+            }
+            usort($items, array('Jojo_Plugin_Jojo_event', $order . 'sort'));
+            $items = $reverse ? array_reverse($items) : $items;
+        }
+        return $items;
+    }
+
+    private static function startdatesort($a, $b)
+    {
+         if ($a['startdate']) {
+            return strnatcasecmp($a['startdate'],$b['startdate']);
+         }
+    }
+
+    private static function enddatesort($a, $b)
+    {
+         if ($a['enddate']) {
+            return strnatcasecmp($a['enddate'],$b['enddate']);
+         }
+    }
+
+    private static function titlesort($a, $b)
+    {
+         if ($a['title']) {
+            return strnatcasecmp($a['title'],$b['title']);
+         }
+    }
+
+    static function getUrl($id=false, $url=false, $title=false, $language=false, $category=false )
     {
         if (_MULTILANGUAGE) {
             $language = !empty($language) ? $language : Jojo::getOption('multilanguage-default', 'en');
-            $mldata = Jojo::getMultiLanguageData();
-            $lclanguage = $mldata['longcodes'][$language];
+            $multilangstring = Jojo::getMultiLanguageString($language, false);
         }
-
+        /* URL specified */
+        if (!empty($url)) {
+            $fullurl = (_MULTILANGUAGE ? $multilangstring : '') . self::_getPrefix('', $category) . '/' . $url . '/';
+            return $fullurl;
+         }
         /* ID + title specified */
         if ($id && !empty($title)) {
-            $fullurl = (_MULTILANGUAGE ? Jojo::getMultiLanguageString($language, false) : '') . self::_getPrefix('event', $language, $categoryid) . '/' . $id . '/' .  Jojo::cleanURL($title) . '/';
-            return $fullurl;
+            $fullurl = (_MULTILANGUAGE ? $multilangstring : '') . self::_getPrefix('', $category) . '/' . $id . '/' .  Jojo::cleanURL($title) . '/';
+          return $fullurl;
         }
         /* use the ID to find either the URL or title */
         if ($id) {
-            $item = Jojo::selectRow("SELECT title, language, category FROM {event} WHERE eventid = ?", $id);
-            if (count($item)) {
-                return self::getUrl($id, $item['title'], $item['language'], $item['category']);
+            $item = Jojo::selectRow("SELECT title, language, category FROM {event} WHERE eventid = ?", array($id));
+             if ($item) {
+                return self::getUrl($id, '', $item['title'], $item['language'], $item['category']);
             }
          }
-        /* No event matching the ID supplied or no ID supplied */
+        /* No item matching the ID supplied or no ID supplied */
         return false;
     }
 
@@ -83,22 +163,50 @@ class JOJO_Plugin_Jojo_event extends JOJO_Plugin
     {
         global $smarty;
         $content = array();
-        $language = !empty($this->page['pg_language']) ? $this->page['pg_language'] : Jojo::getOption('multilanguage-default', 'en');
-        $mldata = Jojo::getMultiLanguageData();
-        $lclanguage = $mldata['longcodes'][$language];
-
-        /* Are we looking at an item or the index? */
+        
+        if (_MULTILANGUAGE) {
+            $language = !empty($this->page['pg_language']) ? $this->page['pg_language'] : Jojo::getOption('multilanguage-default', 'en');
+            $multilangstring = Jojo::getMultiLanguageString($language, false);
+            $smarty->assign('multilangstring', $multilangstring);
+        }
+        /* Are we looking at an event or the index? */
         $id = Jojo::getFormData('id',        0);
-        $category  = Jojo::getFormData('category', '');
-        $findby = ($category) ? $category : $this->page['pg_url'];
-        /* Get category url and id if needed */
-        $pg_url = $this->page['pg_url'];
-        $_CATEGORIES = (Jojo::getOption('event_enable_categories', 'no') == 'yes') ? true : false ;
-        $categorydata =  ($_CATEGORIES) ? Jojo::selectRow("SELECT * FROM {eventcategory} WHERE ec_url = ?", $findby) : '';
-        $categoryid = ($_CATEGORIES && count($categorydata)) ? $categorydata['eventcategoryid'] : 0;
-        $sortby = ($_CATEGORIES && count($categorydata)) ? $categorydata['sortby'] : '';
-
+        $url       = Jojo::getFormData('url',      '');
+        $action    = Jojo::getFormData('action',   '');
+        $pageid = $this->page['pageid'];
+        $categorydata =  Jojo::selectRow("SELECT * FROM {eventcategory} WHERE pageid = ?", $pageid);
+        $categorydata['type'] = isset($categorydata['type']) ? $categorydata['type'] : 'normal';
+        if ($categorydata['type']=='index') {
+            $categoryid = 'all';
+        } elseif ($categorydata['type']=='parent') {
+            $childcategories = Jojo::selectQuery("SELECT eventcategoryid FROM {page} p  LEFT JOIN {eventcategory} c ON (c.pageid=p.pageid) WHERE pg_parent = ? AND pg_link = 'jojo_plugin_jojo_event'", $pageid);
+            foreach ($childcategories as $c) {
+                $categoryid[] = $c['eventcategoryid'];
+            }
+            $categoryid[] = $categorydata['eventcategoryid'];
+        } else {
+            $categoryid = $categorydata['eventcategoryid'];
+        }
+        $sortby = $categorydata ? $categorydata['sortby'] : '';
+        
         $events = self::getItems('', '', $categoryid, $sortby);
+
+        if ($action == 'rss') {
+            $rssfields = array(
+                'pagetitle' => $this->page['pg_title'],
+                'pageurl' => _SITEURL . '/' . (_MULTILANGUAGE ? $multilangstring : '') . $this->page['pg_url'] . '/',
+                'title' => 'title',
+                'body' => 'description',
+                'url' => 'url',
+                'date' => 'date',
+                'datetype' => 'unix',
+                'snip' => (Jojo::getOption('event_full_rss_description') == 'yes' ? 'full' : Jojo::getOption('event_rss_truncate', 800)),
+                'sourcelink' => (boolean)(Jojo::getOption('event_feed_source_link') == 'yes')
+            );
+            $events = array_slice($events, 0, Jojo::getOption('event_rss_num_events', 15));
+            Jojo::getFeed($events, $rssfields);
+        }        
+        
         if ($id) {
 
             /* find the current, next and previous profiles */
@@ -124,23 +232,17 @@ class JOJO_Plugin_Jojo_event extends JOJO_Plugin
                 exit;
             }
 
-            /* Get the specific event */
-            $event['fullurl'] = self::getUrl($id, $event['title'], $event['language'], $event['category']);
-
             /* calculate the next and previous events */
             if (Jojo::getOption('event_next_prev') == 'yes') {
                 if (!empty($nextevent)) {
-                    $nextevent['url'] = self::getUrl($nextevent['eventid'], $nextevent['title'], $nextevent['language'], $nextevent['category']);
                     $smarty->assign('nextevent', $nextevent);
                 }
-
                 if (!empty($prevevent)) {
-                    $prevevent['url'] = self::getUrl($prevevent['eventid'], $prevevent['title'], $prevevent['language'], $prevevent['category']);
                     $smarty->assign('prevevent', $prevevent);
                 }
             }
 
-            /* Ensure the tags class is available */
+            /* if tags class is available */
             if (class_exists('Jojo_Plugin_Jojo_Tags')) {
                 /* Split up tags for display */
                 $tags = Jojo_Plugin_Jojo_Tags::getTags('jojo_event', $eventid);
@@ -152,12 +254,11 @@ class JOJO_Plugin_Jojo_event extends JOJO_Plugin
                     $itemcloud = Jojo_Plugin_Jojo_Tags::getTagCloud('', $tags);
                     $smarty->assign('itemcloud', $itemcloud);
                 }
-            }
-
-            /* Calculate whether the event has expired or not */
-            $now = strtotime('today');
-            if ($now > $event['enddate'] && $event['enddate'] > 0) {
-                $this->expired = true;
+                /* get related items if tags plugin installed and option enabled */
+                if ($numrelated=Jojo::getOption('event_num_related')) {
+                    $related = Jojo_Plugin_Jojo_Tags::getRelated('jojo_event', $id, $numrelated, 'jojo_event');
+                    $smarty->assign('related', $related);
+                }
             }
 
             /* Add breadcrumb */
@@ -165,26 +266,29 @@ class JOJO_Plugin_Jojo_event extends JOJO_Plugin
             $breadcrumb                       = array();
             $breadcrumb['name']               = $event['title'];
             $breadcrumb['rollover']           = $event['snippet'];
-            $breadcrumb['url']                = $event['fullurl'];
+            $breadcrumb['url']                = $event['url'];
             $breadcrumbs[count($breadcrumbs)] = $breadcrumb;
 
             /* Assign event content to Smarty */
             $smarty->assign('event', $event);
- 
-            /* get related items if tags plugin installed and option enabled */
-            $numrelated = Jojo::getOption('event_num_related');
-            if ($numrelated && class_exists('Jojo_Plugin_Jojo_Tags')) {
-                $related = Jojo_Plugin_Jojo_Tags::getRelated('jojo_event', $id, $numrelated, 'jojo_event');
-                $smarty->assign('related', $related);
-            }
 
             /* Prepare fields for display */
             $content['title']            = $event['title'];
             $content['seotitle']         = $event['seotitle'];
             $content['breadcrumbs']      = $breadcrumbs;
-            $meta_description_template = Jojo::getOption('event_meta_description', '[event], an event on [site] - Read all about [event] here.');
-            $content['meta_description'] = str_replace(array('[event]', '[site]'), array($event['title'], _SITETITLE), $meta_description_template);
-            $content['metadescription']  = $content['meta_description'];
+            $meta_description_template = Jojo::getOption('event_meta_description', '[event] - [body]...');
+            $metabody = (strlen($event['bodyplain']) >400) ?  substr($mbody=wordwrap($event['bodyplain'], 400, '$$'), 0, strpos($mbody,'$$')) : $event['bodyplain'];
+            $metafilters = array(
+                    '[title]', 
+                    '[site]', 
+                    '[body]'
+                    );
+            $metafilterreplace = array(
+                    $event['title'], 
+                    _SITETITLE, 
+                    $metabody
+                    );
+            $content['meta_description'] = str_replace($metafilters, $metafilterreplace, $meta_description_template);
 
         } else {
             /* index section */
@@ -195,25 +299,23 @@ class JOJO_Plugin_Jojo_event extends JOJO_Plugin
                 if ($pagenum[0] == 'p') {
                     $pagenum = substr($pagenum, 1);
                 }
-                $smarty->assign('event','');
+                $smarty->assign('event','');    
+                /* get number of events for pagination */
                 $eventsperpage = Jojo::getOption('eventsperpage', 40);
                 $start = ($eventsperpage * ($pagenum-1));
-    
-                /* get number of events for pagination */
-                $now = strtotime('now');
                 $numevents = count($events);
                 $numpages = ceil($numevents / $eventsperpage);
                 /* calculate pagination */
                 if ($numpages == 1) {
                     $pagination = '';
                 } elseif ($numpages == 2 && $pagenum == 2) {
-                    $pagination = sprintf('<a href="%s/p1/">previous...</a>', (_MULTILANGUAGE ? Jojo::getMultiLanguageString ($language, false) : '') . self::_getPrefix('event', (_MULTILANGUAGE ? $language : ''), (!empty($categoryid) ? $categoryid : '')) );
+                    $pagination = sprintf('<a href="%s/p1/">previous...</a>', (_MULTILANGUAGE ? $multilangstring : '') . self::_getPrefix('event', $categoryid) );
                 } elseif ($numpages == 2 && $pagenum == 1) {
-                    $pagination = sprintf('<a href="%s/p2/">more...</a>', (_MULTILANGUAGE ? Jojo::getMultiLanguageString ($language, false) : '') . self::_getPrefix('event', (_MULTILANGUAGE ? $language : ''), ($_CATEGORIES ? $categoryid : '')) );
+                    $pagination = sprintf('<a href="%s/p2/">more...</a>', (_MULTILANGUAGE ? $multilangstring : '') . self::_getPrefix('event', $categoryid) );
                 } else {
                     $pagination = '<ul>';
                     for ($p=1;$p<=$numpages;$p++) {
-                        $url = (_MULTILANGUAGE ? Jojo::getMultiLanguageString ($language, false) : '') . self::_getPrefix('event', (_MULTILANGUAGE ? $language : ''), (!empty($categoryid) ? $categoryid : '')) . '/';
+                        $url = (_MULTILANGUAGE ? $multilangstring : '') . self::_getPrefix('event', $categoryid) . '/';
                         if ($p > 1) {
                             $url .= 'p' . $p . '/';
                         }
@@ -225,11 +327,9 @@ class JOJO_Plugin_Jojo_event extends JOJO_Plugin
                     }
                     $pagination .= '</ul>';
                 }
-                $smarty->assign('pagination',$pagination);
-                $smarty->assign('pagenum',$pagenum);
-                if (_MULTILANGUAGE) {
-                    $smarty->assign('multilangstring', Jojo::getMultiLanguageString($language));
-                }
+                $smarty->assign('pagination', $pagination);
+                $smarty->assign('pagenum', $pagenum);
+
                 /* get event content and assign to Smarty */
                 $events = array_slice($events, $start, $eventsperpage);
                 $smarty->assign('events', $events);
@@ -245,16 +345,222 @@ class JOJO_Plugin_Jojo_event extends JOJO_Plugin
         return $content;
     }
 
-    public static function sitemap($sitemap)
+    static function getPluginPages($for=false, $language=false)
     {
-        /* See if we have any event sections to display and find all of them */
-        $eventindexes = Jojo::selectQuery("SELECT * FROM {page} WHERE pg_link = 'jojo_plugin_jojo_event' AND pg_sitemapnav = 'yes'");
-        if (!count($eventindexes)) {
-            return $sitemap;
+        $items =  Jojo::selectQuery("SELECT c.*, p.pageid, pg_title, pg_url, pg_language, pg_livedate, pg_expirydate, pg_status, pg_sitemapnav, pg_xmlsitemapnav  FROM {eventcategory} c LEFT JOIN {page} p ON (c.pageid=p.pageid) ORDER BY pg_language, pg_parent");
+        $now    = time();
+        global $_USERGROUPS;
+        $pagePermissions = new JOJO_Permissions();
+        foreach ($items as $k=>&$i){
+            $pagePermissions->getPermissions('page', $i['pageid']);
+            if (!$pagePermissions->hasPerm($_USERGROUPS, 'view') || $i['pg_livedate']>$now || (!empty($i['pg_expirydate']) && $i['pg_expirydate']<$now) || $i['pg_status']=='inactive' || ($language && $i['pg_language']!=$language) ) {
+                unset($items[$k]);
+                continue;
+            }
+            if ($for && $for =='sitemap' && $i['pg_sitemapnav']=='no') {
+                unset($items[$k]);
+                continue;
+            } elseif ($for && $for =='xmlsitemap' && $i['pg_xmlsitemapnav']=='no') {
+                unset($items[$k]);
+                continue;
+            }
+        }
+        return $items;
+    }
+
+    static function _getPrefix($for='event', $categoryid=false) {
+        $cacheKey = $for;
+        $cacheKey .= ($categoryid) ? $categoryid : 'false';
+
+        /* Have we got a cached result? */
+        static $_cache;
+        if (isset($_cache[$cacheKey])) {
+            return $_cache[$cacheKey];
         }
 
+        /* Cache some stuff */
+        $res = Jojo::selectRow("SELECT p.pageid, pg_title, pg_url FROM {page} p LEFT JOIN {eventcategory} c ON (c.pageid=p.pageid) WHERE `eventcategoryid` = '$categoryid'");
+        if ($res) {
+            $_cache[$cacheKey] = !empty($res['pg_url']) ? $res['pg_url'] : $res['pageid'] . '/' . $res['pg_title'];
+        } else {
+            $_cache[$cacheKey] = '';
+        }
+        return $_cache[$cacheKey];
+    }
+
+    static function getPrefixById($id=false) {
+        if ($id) {
+            $data = Jojo::selectRow("SELECT category FROM {event} WHERE eventid = ?", array($id));
+            if ($data) {
+                $prefix = self::_getPrefix('', $data['category']);
+                return $prefix;
+            }
+        }
+        return false;
+    }
+
+    function getCorrectUrl()
+    {
+        global $page;
+        $language  = $page->page['pg_language'];
+        $id = Jojo::getFormData('id',     0);
+        $url       = Jojo::getFormData('url',    '');
+        $action    = Jojo::getFormData('action', '');
+        $pagenum   = Jojo::getFormData('pagenum', 1);
+
+        $data = Jojo::selectRow("SELECT eventcategoryid FROM {eventcategory} WHERE pageid=?", $page->page['pageid']);
+        $categoryid = !empty($data['eventcategoryid']) ? $data['eventcategoryid'] : '';
+
+        if ($pagenum[0] == 'p') {
+            $pagenum = substr($pagenum, 1);
+        }
+
+        $correcturl = self::getUrl($id, $url, null, $language, $categoryid);
+        if ($correcturl) {
+            return _SITEURL . '/' . $correcturl;
+        }
+
+        /* index with pagination */
+        if ($pagenum > 1) return parent::getCorrectUrl() . 'p' . $pagenum . '/';
+
+        if ($action == 'rss') return parent::getCorrectUrl() . 'rss/';
+
+        /* event index - default */
+        return parent::getCorrectUrl();
+    }
+
+    static public function isUrl($uri)
+    {
+        $prefix = false;
+        $getvars = array();
+        /* Check the suffix matches and extract the prefix */
+       if ($uribits = Jojo_Plugin::isPluginUrl($uri)) {
+            $prefix = $uribits['prefix'];
+            $getvars = $uribits['getvars'];
+        } else {
+            return false;
+        }
+        /* Check the prefix matches */
+        if ($res = self::checkPrefix($prefix)) {
+            /* If full uri matches a prefix it's an index page so ignore it and let the page plugin handle it */
+            if (self::checkPrefix(trim($uri, '/'))) return false;
+            /* The prefix is good, pass through uri parts */
+            foreach($getvars as $k => $v) {
+                $_GET[$k] = $v;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check if a prefix is an event prefix
+     */
+    static public function checkPrefix($prefix)
+    {
+        static $_prefixes, $categories;
+        if (!isset($categories)) {
+            /* Initialise cache */
+            $categories = array(false);
+            $categories = array_merge($categories, Jojo::selectAssoc("SELECT eventcategoryid, eventcategoryid as eventcategoryid2 FROM {eventcategory}"));
+            $_prefixes = array();
+        }
+        /* Check if it's in the cache */
+        if (isset($_prefixes[$prefix])) {
+            return $_prefixes[$prefix];
+        }
+        /* Check everything */
+        foreach($categories as $category) {
+            $testPrefix = self::_getPrefix('event', $category);
+            $_prefixes[$testPrefix] = true;
+            if ($testPrefix == $prefix) {
+                /* The prefix is good */
+                return true;
+            }
+        }
+        /* Didn't match */
+        $_prefixes[$testPrefix] = false;
+        return false;
+    }
+
+
+    // Sync the category data over to the page table
+    static function admin_action_after_save_eventcategory() {
+        if (!Jojo::getFormData('fm_pageid', 0)) {
+            // no pageid set for this category (either it's a new category or maybe the original page was deleted)
+            self::sync_category_to_page();
+       }
+    }
+
+    // Sync the category data over from the page table
+    static function admin_action_after_save_page() {
+        if (strtolower(Jojo::getFormData('fm_pg_link',    ''))=='jojo_plugin_jojo_event') {
+           self::sync_page_to_category();
+       }
+    }
+
+    static function sync_category_to_page() {
+        // Get the category id (if an existing category being saved where the page has been deleted)
+        $catid = Jojo::getFormData('fm_eventcategoryid', 0);
+        if (!$catid) {
+        // no id because this is a new category - shouldn't really be done this way, new categories should be added by adding a new page
+            $cats = Jojo::selectQuery("SELECT eventcategoryid FROM {eventcategory} ORDER BY eventcategoryid");
+            // grab the highest id (assumes this is the newest one just created)
+            $cat = array_pop($cats);
+            $catid = $cat['eventcategoryid'];
+        }
+        // add a new hidden page for this category and make up a title
+            $newpageid = Jojo::insertQuery(
+            "INSERT INTO {page} SET pg_title = ?, pg_link = ?, pg_url = ?, pg_parent = ?, pg_status = ?",
+            array(
+                'Orphaned events',  // Title
+                'jojo_plugin_jojo_event',  // Link
+                'orphaned-events',  // URL
+                0,  // Parent - don't do anything smart, just put it at the top level for now
+                'hidden' // hide new page so it doesn't show up on the live site until it's been given a proper title and url
+            )
+        );        
+        // If we successfully added the page, update the category with the new pageid
+        if ($newpageid) {
+            jojo::updateQuery(
+                "UPDATE {eventcategory} SET pageid = ? WHERE eventcategoryid = ?",
+                array(
+                    $newpageid,
+                    $catid
+                )
+            );
+       }
+    return true;
+    }
+
+    static function sync_page_to_category() {
+        // Get the list of categories and the page id if available
+        $categories = jojo::selectAssoc("SELECT pageid AS id, pageid FROM {eventcategory}");
+        $pageid = Jojo::getFormData('fm_pageid', 0);
+        // if it's a new page it won't have an id in the form data, so get it from the title
+        if (!$pageid) {
+           $title = Jojo::getFormData('fm_pg_title', 0);
+           $page =  Jojo::selectRow("SELECT pageid, pg_url FROM {page} WHERE pg_title= ? AND pg_link = ? AND pg_language = ?", array($title, Jojo::getFormData('fm_pg_link', ''), Jojo::getFormData('fm_pg_language', '')));
+           $pageid = $page['pageid'];
+        }
+        // no category for this page id
+        if (!count($categories) || !isset($categories[$pageid])) { 
+            jojo::insertQuery("INSERT INTO {eventcategory} (pageid) VALUES ('$pageid')");
+        }
+        return true;
+    }
+
+    public static function sitemap($sitemap)
+    {
+        global $page;
+        /* See if we have any event sections to display and find all of them */
+        $indexes =  self::getPluginPages('sitemap');
+        if (!count($indexes)) {
+            return $sitemap;
+        }
+        
         if (Jojo::getOption('event_inplacesitemap', 'separate') == 'separate') {
-            /* Remove any existing links to this section from the page listing on the sitemap */
+            /* Remove any existing links to the events section from the page listing on the sitemap */
             foreach($sitemap as $j => $section) {
                 $sitemap[$j]['tree'] = self::_sitemapRemoveSelf($section['tree']);
             }
@@ -263,27 +569,20 @@ class JOJO_Plugin_Jojo_event extends JOJO_Plugin
             $_INPLACE = true;
         }
 
-        $now = strtotime('now');
         $limit = 15;
         $eventsperpage = Jojo::getOption('eventsperpage', 40);
-        $limit = ($eventsperpage >= 15) ? 15 : $eventsperpage ;
          /* Make sitemap trees for each events instance found */
-        foreach($eventindexes as $k => $i){
-            /* Get language and language longcode if needed */
-            if (_MULTILANGUAGE) {
-                $language = !empty($i['pg_language']) ? $i['pg_language'] : Jojo::getOption('multilanguage-default', 'en');
-                $mldata = Jojo::getMultiLanguageData();
-                $lclanguage = $mldata['longcodes'][$language];
-            }
-            /* Get category url and id if needed */
-            $pg_url = $i['pg_url'];
-            $_CATEGORIES = (Jojo::getOption('event_enable_categories', 'no') == 'yes') ? true : false ;
-            $categorydata =  ($_CATEGORIES) ? Jojo::selectRow("SELECT eventcategoryid FROM {eventcategory} WHERE `ec_url` = ?", array($pg_url)) : '';
-            $categoryid = ($_CATEGORIES && count($categorydata)) ? $categorydata['eventcategoryid'] : '';
+        foreach($indexes as $k => $i){
+            /* Set language */
+            $language = (_MULTILANGUAGE && !empty($i['pg_language'])) ? $i['pg_language'] : '';
+            $multilangstring = Jojo::getMultiLanguageString($language, false);
+            /* Set category */
+            $categoryid = $i['eventcategoryid'];
+            $sortby = $i['sortby'];
 
             /* Create tree and add index and feed links at the top */
             $eventtree = new hktree();
-            $indexurl = (_MULTILANGUAGE) ? Jojo::getMultiLanguageString($language, false) . self::_getPrefix('event', $language, $categoryid) . '/' : self::_getPrefix('event', '', $categoryid) . '/' ;
+            $indexurl = (_MULTILANGUAGE ? $multilangstring : '' ) . self::_getPrefix('event', $categoryid) . '/';
             if ($_INPLACE) {
                 $parent = 0;
             } else {
@@ -291,60 +590,47 @@ class JOJO_Plugin_Jojo_event extends JOJO_Plugin
                $parent = 'index';
             }
 
-            /* Get the event content from the database */
-            $query =  "SELECT * FROM {event} WHERE enddate>$now";
-            $query .= (_MULTILANGUAGE) ? " AND (language = '$language')" : '';
-            $query .= ($_CATEGORIES) ? " AND (category = '$categoryid')" : '';
-            $query .= " ORDER BY startdate ASC LIMIT $limit";
-
-            $events = Jojo::selectQuery($query);
+            $events = self::getItems('', '', $categoryid, $sortby);
             $n = count($events);
-            foreach ($events as $item) {
-                $eventtree->addNode($item['eventid'], $parent, $item['title'], self::getUrl($item['eventid'], $item['title'], $item['language'], $item['category']));
+
+            /* Trim items down to first page and add to tree*/
+            $events = array_slice($events, 0, $eventsperpage);
+            foreach ($events as $a) {
+                $eventtree->addNode($a['id'], $parent, $a['title'], $a['url']);
             }
 
-            /* Get number of events for pagination */
-            $countquery =  "SELECT COUNT(*) AS numevents FROM {event} WHERE enddate>$now";
-            $countquery .= (_MULTILANGUAGE) ? " AND (language = '$language')" : '';
-            $countquery .= ($_CATEGORIES) ? " AND (category = '$categoryid')" : '';
-            $eventscount = Jojo::selectQuery($countquery);
-            $numevents = $eventscount[0]['numevents'];
-            $numpages = ceil($numevents / $eventsperpage);
-
+            /* Get number of pages for pagination */
+            $numpages = ceil($n / $eventsperpage);
             /* calculate pagination */
-            if ($numpages == 1) {
-                if ($limit < $numevents) {
-                    $eventtree->addNode('p1', $parent, 'More ' . $i['pg_title'] , $indexurl );
-                }
-            } else {
-                for ($p=1; $p <= $numpages; $p++) {
-                    if (($limit < $eventsperpage) && ($p == 1)) {
-                        $eventtree->addNode('p1', $parent, '...More' , $indexurl );
-                    } elseif ($p != 1) {
-                        $url = $indexurl .'p' . $p .'/';
-                        $nodetitle = $i['pg_title'] . ' Index - p'. $p;
-                        $eventtree->addNode('p' . $p, $parent, $nodetitle, $url);
-                    }
+            if ($numpages > 1) {
+                for ($p=2; $p <= $numpages; $p++) {
+                    $url = $indexurl .'p' . $p .'/';
+                    $nodetitle = $i['pg_title'] . '  - page '. $p;
+                    $eventtree->addNode('p' . $p, $parent, $nodetitle, $url);
                 }
             }
+            /* Add RSS link for the plugin page */
+           $eventtree->addNode('rss', $parent, $i['pg_title'] . ' RSS Feed', $indexurl . 'rss/');
 
             /* Check for child pages of the plugin page */
-            foreach (Jojo::selectQuery("SELECT * FROM {page} WHERE pg_parent = '" . $i['pageid'] . "' AND pg_sitemapnav = 'yes'") as $c) {
-                /* Check whether an RSS Feed page exists and is to be shown on the sitemap, and if so, add it to the sitemap array */
-                if ($c['pg_link']=='jojo_plugin_jojo_event_rss') {
-                    $rssurl = ((_MULTILANGUAGE) ? Jojo::getMultiLanguageString($language, false) : '') . self::_getPrefix('rss', ((_MULTILANGUAGE) ? $language : ''), $categoryid) . '/';
-                    $eventtree->addNode('index-rss', $parent, $c['pg_title'], $rssurl);
-                } else {
-                    $eventtree->addNode($c['pageid'], $parent, $c['pg_title'], $c['pg_url'] . '/');
-                }
+            foreach (Jojo::selectQuery("SELECT pageid, pg_title, pg_url FROM {page} WHERE pg_parent = '" . $i['pageid'] . "' AND pg_sitemapnav = 'yes'") as $c) {
+                    if ($c['pg_url']) {
+                        $eventtree->addNode($c['pageid'], $parent, $c['pg_title'], (_MULTILANGUAGE ? $multilangstring : '') . $c['pg_url'] . '/');
+                    } else {
+                        $eventtree->addNode($c['pageid'], $parent, $c['pg_title'], (_MULTILANGUAGE ? $multilangstring : '') . $c['pageid']  . '/' .  Jojo::cleanURL($c['pg_title']) . '/');
+                    }
             }
 
             /* Add to the sitemap array */
             if ($_INPLACE) {
                 /* Add inplace */
-                $url = ((_MULTILANGUAGE) ? Jojo::getMultiLanguageString ( $language, false ) : '') . self::_getPrefix('event', ((_MULTILANGUAGE) ? $language : ''), $categoryid) . '/';
+                $url = (_MULTILANGUAGE ? $multilangstring : '') . self::_getPrefix('event', $categoryid) . '/';
                 $sitemap['pages']['tree'] = self::_sitemapAddInplace($sitemap['pages']['tree'], $eventtree->asArray(), $url);
             } else {
+                if (_MULTILANGUAGE) {
+                    $mldata = Jojo::getMultiLanguageData();
+                    $lclanguage = $mldata['longcodes'][$language];
+                }
                 /* Add to the end */
                 $sitemap["events$k"] = array(
                     'title' => $i['pg_title'] . ( _MULTILANGUAGE ? ' (' . ucfirst($lclanguage) . ')' : ''),
@@ -364,7 +650,7 @@ class JOJO_Plugin_Jojo_event extends JOJO_Plugin
             if ($t['url'] == $url) {
                 $sitemap[$k]['children'] = $toadd;
             } elseif (isset($sitemap[$k]['children'])) {
-                $sitemap[$k]['children'] = Jojo_Plugin_Jojo_event::_sitemapAddInplace($t['children'], $toadd, $url);
+                $sitemap[$k]['children'] = self::_sitemapAddInplace($t['children'], $toadd, $url);
             }
         }
         return $sitemap;
@@ -373,21 +659,18 @@ class JOJO_Plugin_Jojo_event extends JOJO_Plugin
     static function _sitemapRemoveSelf($tree)
     {
         static $urls;
-        $_CATEGORIES = (Jojo::getOption('event_enable_categories', 'no') == 'yes') ? true : false ;
 
         if (!is_array($urls)) {
             $urls = array();
-            $eventindexes = Jojo::selectQuery("SELECT p.*" . ($_CATEGORIES ? ", c.eventcategoryid" : '') . " FROM {page} p " . ($_CATEGORIES ? "LEFT JOIN {eventcategory} c ON (pg_url=ec_url) " : '') . "WHERE pg_link = 'jojo_plugin_jojo_event' AND pg_sitemapnav = 'yes'");
-            if (count($eventindexes)==0) {
+            $indexes =  self::getPluginPages('sitemap');
+            if (count($indexes)==0) {
                return $tree;
             }
-
-            foreach($eventindexes as $key => $i){
-                $language = !empty($i['pg_language']) ? $i['pg_language'] : Jojo::getOption('multilanguage-default', 'en');
-                $mldata = Jojo::getMultiLanguageData();
-                $lclanguage = $mldata['longcodes'][$language];
-                $urls[] = ((_MULTILANGUAGE) ? $lclanguage . '/' : '') . self::_getPrefix('event', ((_MULTILANGUAGE) ? $language : ''), ($_CATEGORIES ? $i['eventcategoryid'] : '')) . '/';
-                $urls[] = ((_MULTILANGUAGE) ? $lclanguage . '/' : '') . self::_getPrefix('rss', ((_MULTILANGUAGE) ? $language : ''), ($_CATEGORIES ? $i['eventcategoryid'] : '')) . '/';
+            foreach($indexes as $key => $i){
+                $language = (_MULTILANGUAGE && !empty($i['pg_language'])) ? $i['pg_language'] : '';
+                $multilangstring = Jojo::getMultiLanguageString($language, false);
+                $urls[] = (_MULTILANGUAGE ? $multilangstring : '')  . self::_getPrefix('event', $i['eventcategoryid']) . '/';
+                $urls[] = (_MULTILANGUAGE ? $multilangstring : '')  . self::_getPrefix('event', $i['eventcategoryid']) . '/rss/';
             }
         }
 
@@ -409,143 +692,29 @@ class JOJO_Plugin_Jojo_event extends JOJO_Plugin
      */
     static function xmlsitemap($sitemap)
     {
-        /* See if we have any event sections to display and find all of them */
-        $eventindexes = Jojo::selectQuery("SELECT * FROM {page} WHERE pg_link = 'jojo_plugin_jojo_event' AND pg_xmlsitemapnav = 'yes'");
-        if (!count($eventindexes)) {
-            return $sitemap;
+        /* Get events from database */
+        $events = self::getevents('', '', 'all', '', '', 'alllanguages');
+        $now = time();
+        $indexes =  self::getPluginPages('xmlsitemap');
+        $ids=array();
+        foreach ($indexes as $i) {
+            $ids[$i['eventcategoryid']] = true;
         }
-        $now = strtotime('now');
-         /* Add sitemap entries for each event page instance found */
-        foreach($eventindexes as $k => $i){
-            /* Get language and language longcode if needed */
-            if (_MULTILANGUAGE) {
-                $language = !empty($i['pg_language']) ? $i['pg_language'] : Jojo::getOption('multilanguage-default', 'en');
-                $mldata = Jojo::getMultiLanguageData();
-                $lclanguage = $mldata['longcodes'][$language];
-            }
-            /* Get category url and id if needed */
-            $pg_url = $i['pg_url'];
-            $_CATEGORIES = (Jojo::getOption('event_enable_categories', 'no') == 'yes') ? true : false ;
-            $categorydata =  ($_CATEGORIES) ? Jojo::selectRow("SELECT eventcategoryid FROM {eventcategory} WHERE `ec_url` = '$pg_url'") : '';
-            $categoryid = ($_CATEGORIES && count($categorydata)) ? $categorydata['eventcategoryid'] : '';
-
-            /* Get the event content from the database */
-            $query =  "SELECT * FROM {event} WHERE enddate>$now";
-            $query .= (_MULTILANGUAGE) ? " AND (language = '$language')" : '';
-            $query .= ($_CATEGORIES) ? " AND (category = '$categoryid')" : '';
-            $events = Jojo::selectQuery($query);
-    
-            /* Add events to sitemap */
-            foreach($events as $item) {
-                $url = _SITEURL . '/'. self::getUrl($item['eventid'], $item['title'], $item['language'], $item['category']);
-                $lastmod = '';
-                $priority = 0.6;
-                $changefreq = '';
-                $sitemap[$url] = array($url, $lastmod, $changefreq, $priority);
-            }
-        }
-
-        /* Return sitemap */
-        return $sitemap;
-    }
-
-    /**
-     * Site Search
-     *
-     */
-    static function search($results, $keywords, $language, $booleankeyword_str=false)
-    {
-        global $_USERGROUPS;
-        $_CATEGORIES = (Jojo::getOption('event_enable_categories', 'no') == 'yes') ? true : false ;
-        $_TAGS = class_exists('Jojo_Plugin_Jojo_Tags') ? true : false ;
-        $pagePermissions = new JOJO_Permissions();
-        $boolean = ($booleankeyword_str) ? true : false;
-        $keywords_str = ($boolean) ? $booleankeyword_str :  implode(' ', $keywords);
-        if ($boolean && stripos($booleankeyword_str, '+') === 0  ) {
-            $like = '1';
-            foreach ($keywords as $keyword) {
-                $like .= sprintf(" AND (description LIKE '%%%s%%' OR title LIKE '%%%s%%')", Jojo::clean($keyword), Jojo::clean($keyword));
-            }
-        } elseif ($boolean && stripos($booleankeyword_str, '"') === 0) {
-            $like = "(description LIKE '%%%". implode(' ', $keywords). "%%' OR title LIKE '%%%". implode(' ', $keywords) . "%%')";
-        } else {
-            $like = '(0';
-            foreach ($keywords as $keyword) {
-                $like .= sprintf(" OR description LIKE '%%%s%%' OR title LIKE '%%%s%%'", Jojo::clean($keyword), Jojo::clean($keyword));
-            }
-            $like .= ')';
-        }
-        $tagid = ($_TAGS) ? Jojo_Plugin_Jojo_Tags::_getTagId(implode(' ', $keywords)): '';
-
-        $query = "SELECT eventid, title, location, description, event_image, language, enddate, startdate, category, ((MATCH(title) AGAINST (?" . ($boolean ? ' IN BOOLEAN MODE' : '') . ") * 0.2) + MATCH(title, location, description) AGAINST (?" . ($boolean ? ' IN BOOLEAN MODE' : '') . ")) AS relevance";
-        $query .= ", p.pg_url, p.pg_title";
-        $query .= " FROM {event} AS event ";
-        $query .= $_CATEGORIES ? " LEFT JOIN {eventcategory} c ON (event.category=c.eventcategoryid) LEFT JOIN {page} p ON (p.pg_link='jojo_plugin_jojo_event' AND c.ec_url=p.pg_url)" : "LEFT JOIN {page} p ON (p.pg_link='jojo_plugin_jojo_event' AND p.pg_language=language)";
-        $query .= ($language) ? " LEFT JOIN {language} AS language ON (event.language = languageid)" : '';
-        $query .= $tagid ? " LEFT JOIN {tag_item} AS tag ON (tag.itemid = event.eventid AND tag.plugin='jojo_event' AND tag.tagid = $tagid)" : '';
-        $query .= " WHERE ($like";
-        $query .= $tagid ? " OR (tag.itemid = event.eventid AND tag.plugin='jojo_event' AND tag.tagid = $tagid))" : ')';
-        $query .= ($language) ? " AND language = '$language' AND language.active = 'yes' " : '';
-        $query .= " AND enddate>" . time();
-        $query .= " AND p.pg_link='jojo_plugin_jojo_event'";
-        $query .= " ORDER BY relevance DESC LIMIT 100";
-
-        $data = Jojo::selectQuery($query, array($keywords_str, $keywords_str));
-
-        if (_MULTILANGUAGE) {
-            global $page;
-            $mldata = Jojo::getMultiLanguageData();
-            $homes = $mldata['homes'];
-        } else {
-            $homes = array(1);
-        }
-
-        foreach ($data as $d) {
-            $pagePermissions->getPermissions('event', $d['eventid']);
-            if (!$pagePermissions->hasPerm($_USERGROUPS, 'view')) {
+        /* Add events to sitemap */
+        foreach($events as $k => $a) {
+            // strip out events from expired pages
+            if (!isset($ids[$a['category']])) {
+                unset($events[$k]);
                 continue;
             }
-            $result = array();
-            $result['relevance'] = $d['relevance'];
-            $result['title'] = $d['title'];
-            $result['body'] = $d['description'];
-            $result['image'] = 'events/' . $d['event_image'];
-            $result['url'] = self::getUrl($d['eventid'], $d['title'], $d['language'], $d['category']);
-            $result['absoluteurl'] = _SITEURL. '/' . $result['url'];
-            $result['id'] = $d['eventid'];
-            $result['plugin'] = 'jojo_event';
-            $result['type'] = $d['pg_title'] ? $d['pg_title'] : 'Events';
-
-            if ($_TAGS) {
-                $result['tags'] = Jojo_Plugin_Jojo_Tags::getTags('jojo_event', $d['eventid']);
-                if ($result['tags'] && array_search(implode(' ', $keywords), $result['tags']) !== false) $result['relevance'] = $result['relevance'] + 1 ;
-            }
-            $results[] = $result;
+            $url = _SITEURL . '/'. $a['url'];
+            $lastmod = '';
+            $priority = 0.6;
+            $changefreq = '';
+            $sitemap[$url] = array($url, $lastmod, $changefreq, $priority);
         }
-
-        /* Return results */
-        return $results;
-    }
-
-   /**
-     * RSS Icon filter
-     * Places the RSS feed icon in the head of the document, sitewide
-     */
-    static function rssicon($data)
-    {
-        $link = Jojo::getOption('event_external_rss');
-        $data['Events'] = !empty($link) ? $link : _SITEURL . '/' . self::_getPrefix('rss');
-
-        /* add category RSS feed */
-        $pg_url = _SITEURI;
-        $_CATEGORIES = (Jojo::getOption('event_enable_categories', 'no') == 'yes') ? true : false ;
-        $categorydata =  ($_CATEGORIES) ? Jojo::selectRow("SELECT eventcategoryid FROM {eventcategory} WHERE ec_url = '$pg_url'") : '';
-        $categoryid = ($_CATEGORIES && count($categorydata)) ? $categorydata['eventcategoryid'] : '';
-
-        if ( $_CATEGORIES && !empty($categoryid)) {
-            $data['Events - '.$pg_url] = _SITEURL . '/' . self::_getPrefix('rss', false, $categoryid);
-        }
-        return $data;
+        /* Return sitemap */
+        return $sitemap;
     }
 
     /**
@@ -558,226 +727,62 @@ class JOJO_Plugin_Jojo_event extends JOJO_Plugin
         return $data;
     }
 
-
-    /**
-     * Get the url prefix for a particular part of this plugin
+   /**
+     * RSS Icon filter
+     * Places the RSS feed icon in the head of the document, sitewide
      */
-    static function _getPrefix($for='event', $language=false, $categoryid=false) {
-        $cacheKey = $for;
-        $cacheKey .= ($language) ? $language : 'false';
-        $cacheKey .= ($categoryid) ? $categoryid : 'false';
-
-        /* Have we got a cached result? */
-        static $_cache;
-        if (isset($_cache[$cacheKey])) {
-            return $_cache[$cacheKey];
-        }
-
-        if (!in_array($for, array('event', 'rss'))) {
-            return '';
-        }
-        /* Cache some stuff */
-        $language = $language ? $language : Jojo::getOption('multilanguage-default', 'en');
-        $_CATEGORIES = (Jojo::getOption('event_enable_categories', 'no') == 'yes') ? true : false ;
-        $categorydata =  ($_CATEGORIES && $categoryid) ? Jojo::selectRow("SELECT `ec_url` FROM {eventcategory} WHERE `eventcategoryid` = '$categoryid';") : '';
-        $category = ($_CATEGORIES && isset($categorydata['ec_url'])) ? $categorydata['ec_url'] : '';
-        $query = "SELECT pageid, pg_title, pg_url FROM {page} WHERE pg_link = ?";
-        $query .= (_MULTILANGUAGE) ? " AND pg_language = '$language'" : '';
-        $query .= $category ? " AND pg_url LIKE '%$category'": '';
-
-        if ($for == 'event') {
-            $values = array('jojo_plugin_jojo_event');
-        } elseif ($for == 'rss') {
-            $query = "SELECT pageid, pg_title, pg_url FROM {page} WHERE pg_link = ?";
-            $query .= (_MULTILANGUAGE) ? " AND pg_language = '$language'" : '';
-            $query .= (!empty($category)) ? " AND pg_url LIKE '$category%'": '';
-            $values = array('jojo_plugin_jojo_event_rss');
-        }
-
-        $res = Jojo::selectRow($query, $values);
-        if ($res) {
-            $_cache[$cacheKey] = !empty($res['pg_url']) ? $res['pg_url'] : $res['pageid'] . '/' . $res['pg_title'];
-        } else {
-            $_cache[$cacheKey] = '';
-        }
-        return $_cache[$cacheKey];
-    }
-
-    function getCorrectUrl()
+    static function rssicon($data)
     {
         global $page;
-        $language  = $page->page['pg_language'];
-        $pg_url    = $page->page['pg_url'];
-        $eventid = Jojo::getFormData('id',     0);
-        $pagenum   = Jojo::getFormData('pagenum', 1);
-
-		$category  = Jojo::getFormData('category', '');
-
-        $data = array('category' => '');
-        if (Jojo::getOption('event_enable_categories', 'no') == 'yes') {
-            $data = Jojo::selectRow("SELECT eventcategoryid FROM {eventcategory} WHERE ec_url=?", $category);
+        $link = Jojo::getOption('event_external_rss');
+        if ($link) {
+            $data['Events'] =  $link;
         }
-        $categoryid = !empty($data['eventcategoryid']) ? $data['eventcategoryid'] : '';
-
-        if ($pagenum[0] == 'p') {
-            $pagenum = substr($pagenum, 1);
-        }
-
-        $correcturl = self::getUrl($eventid);
-        if ($correcturl) {
-            return _SITEURL . '/' . $correcturl;
-        }
-
-        /* event index with pagination */
-        if ($pagenum > 1) return parent::getCorrectUrl() . 'p' . $pagenum . '/';
-
-        /* event index - default */
-        return parent::getCorrectUrl();
-    }
-
-    static public function isUrl($uri)
-    {
-        $prefix = false;
-        $getvars = array();
-        /* Check the suffix matches and extra the prefix */
-        if (preg_match('#^(.+)/([0-9]+)/([^/]+)$#', $uri, $matches)) {
-            /* "$prefix/[id:integer]/[string]" eg "events/123/name-of-event/" */
-            $prefix = $matches[1];
-            $getvars = array(
-                        'id' => $matches[2],
-                        'category' => $prefix
-                        );
-        } elseif (preg_match('#^(.+)/([0-9]+)$#', $uri, $matches)) {
-            /* "$prefix/[id:integer]" eg "events/123/" */
-            $prefix = $matches[1];
-            $getvars = array(
-                        'id' => $matches[2],
-                        'category' => $prefix
-                        );
-        } elseif (preg_match('#^(.+)/p([0-9]+)$#', $uri, $matches)) {
-            /* "$prefix/p[pagenum:([0-9]+)]" eg "events/p2/" for pagination of events */
-            $prefix = $matches[1];
-            $getvars = array(
-                        'pagenum' => $matches[2],
-                        'category' => $prefix
-                        );
-        } elseif (preg_match('#^(.+)/((?!rss)([a-z0-9-_]+))$#', $uri, $matches)) {
-            /* "$prefix/[url:((?!rss)string)]" eg "events/name-of-event/" ignoring "events/rss" */
-            $prefix = $matches[1];
-            $getvars = array(
-                        'url' => $matches[2],
-                        'category' => $prefix
-                        );
-            $row = Jojo::selectRow("SELECT eventcategoryid FROM {eventcategory} WHERE ec_url LIKE ?", $uri);
-            if ($row) return false;
-        } else {
-            /* Didn't match */
-            return false;
-        }
-
-        /* Check the prefix matches */
-        if ($res = self::checkPrefix($prefix)) {
-            /* The prefix is good, pass through uri parts */
-            foreach($getvars as $k => $v) {
-                $_GET[$k] = $v;
+        /* add RSS feeds for each page */
+        $categories =  self::getPluginPages('', (_MULTILANGUAGE ? $page->page['pg_language'] : ''));
+        foreach ($categories as $c) {
+            $prefix =  self::_getPrefix('', $c['eventcategoryid']) . '/rss/';
+            if ($prefix && $c['rsslink']==1) {
+                $data[$c['pg_title']] = _SITEURL . '/' .  (_MULTILANGUAGE ? Jojo::getMultiLanguageString($c['pg_language'], false) : '') . $prefix;
             }
-
-            return true;
         }
-        return false;
+        return $data;
     }
 
     /**
-     * Check if a prefix is an event prefix
+     * Site Search
      */
-    static public function checkPrefix($prefix)
+    static function search($results, $keywords, $language, $booleankeyword_str=false)
     {
-        static $_prefixes, $languages, $categories;
-        if (!isset($languages)) {
-            /* Initialise cache */
-            if (Jojo::tableExists('lang_country')) {
-                $languages = Jojo::selectAssoc("SELECT lc_code, lc_code as lc_code2 FROM {lang_country}");
-            } else {
-                $languages = Jojo::selectAssoc("SELECT languageid, languageid as languageid2 FROM {language} WHERE active = 'yes'");
-            }
-            $categories = array(false);
-            if (Jojo::getOption('event_enable_categories', 'no') == 'yes') {
-                $categories = array_merge($categories, Jojo::selectAssoc("SELECT eventcategoryid, eventcategoryid as eventcategoryid2 FROM {eventcategory}"));
-            }
-            $_prefixes = array();
-        }
-        /* Check if it's in the cache */
-        if (isset($_prefixes[$prefix])) {
-            return $_prefixes[$prefix];
-        }
-        /* Check everything */
-        foreach ($languages as $language) {
-            $language = $language ? $language : Jojo::getOption('multilanguage-default', 'en');
-            foreach($categories as $category) {
-                $testPrefix = self::_getPrefix('event', $language, $category);
-                $_prefixes[$testPrefix] = true;
-                if ($testPrefix == $prefix) {
-                    /* The prefix is good */
-                    return true;
-                }
+        $searchfields = array(
+            'plugin' => 'jojo_event',
+            'table' => 'event',
+            'idfield' => 'eventid',
+            'languagefield' => 'language',
+            'primaryfields' => 'title',
+            'secondaryfields' => 'title, location, description',
+        );
+        $rawresults =  Jojo_Plugin_Jojo_search::searchPlugin($searchfields, $keywords, $language, $booleankeyword_str=false);
+        $data = $rawresults ? self::getItemsById(array_keys($rawresults)) : '';
+        if ($data) {
+            foreach ($data as $result) {
+                $result['relevance'] = $rawresults[$result['id']]['relevance'];
+                $result['body'] = $result['bodyplain'];
+                $result['type'] = $result['pagetitle'];
+                $result['tags'] = isset($rawresults[$result['id']]['tags']) ? $rawresults[$result['id']]['tags'] : '';
+                $results[] = $result;
             }
         }
-
-        /* Didn't match */
-        $_prefixes[$testPrefix] = false;
-        return false;
+        /* Return results */
+        return $results;
     }
+
 /*
 * Tags
 */
-
-    static function saveTags($record, $tags = array())
-    {
-        /* Ensure the tags class is available */
-        if (!class_exists('Jojo_Plugin_Jojo_Tags')) {
-            return false;
-        }
-
-        /* Delete existing tags for this item */
-        Jojo_Plugin_Jojo_Tags::deleteTags('jojo_event', $record['eventid']);
-
-        /* Save all the new tags */
-        foreach($tags as $tag) {
-            Jojo_Plugin_Jojo_Tags::saveTag($tag, 'jojo_event', $record['eventid']);
-        }
-    }
-
     static function getTagSnippets($ids)
     {
-        /* Convert array of ids to a string */
-        $ids = "'" . implode($ids, "', '") . "'";
-
-        /* Get the events */
-        $events = Jojo::selectQuery("SELECT *
-                                       FROM {event}
-                                       WHERE
-                                            eventid IN ($ids)
-                                         AND
-                                           enddate > ?
-                                       ORDER BY
-                                         startdate ASC",
-                                      array(time())
-                                      );
-
-        /* Create the snippets */
-        $snippets = array();
-        foreach ($events as $i => $a) {
-            $image = !empty($a['event_image']) ? 'events/' . $a['event_image'] : '';
-            $snippets[] = array(
-                    'id'    => $a['eventid'],
-                    'image' => $image,
-                    'title' => htmlspecialchars($a['title'], ENT_COMPAT, 'UTF-8', false),
-                    'text'  => strip_tags($a['description']),
-                    'url'   => Jojo::urlPrefix(false) . self::getUrl($a['eventid'], $a['title'], $a['language'], $a['category'])
-                );
-        }
-
-        /* Return the snippets */
+        $snippets = self::getItemsById($ids);
         return $snippets;
     }
 }

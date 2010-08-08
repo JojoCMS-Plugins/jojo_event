@@ -21,7 +21,8 @@
 $data = Jojo::selectQuery("SELECT * FROM {page} WHERE pg_link='jojo_plugin_jojo_event'");
 if (!count($data)) {
     echo "Adding <b>Events</b> Page to menu<br />";
-    Jojo::insertQuery("INSERT INTO {page} SET pg_title='Events', pg_link='jojo_plugin_jojo_event', pg_url='events'");
+    $eventpageid = Jojo::insertQuery("INSERT INTO {page} SET pg_title='Events', pg_link='jojo_plugin_jojo_event', pg_url='events'");
+    Jojo::insertQuery("INSERT INTO {eventcategory} SET pageid=?", array($eventpageid));
 } 
 
 /* edit Events page */
@@ -31,21 +32,11 @@ if (!count($data)) {
     Jojo::insertQuery("INSERT INTO {page} SET pg_title='Edit Events', pg_link='Jojo_Plugin_Admin_Edit', pg_url='admin/edit/event', pg_parent=?, pg_order=5, pg_mainnav='yes', pg_breadcrumbnav='yes', pg_sitemapnav='no', pg_xmlsitemapnav='no', pg_footernav='no', pg_index='no'", $_ADMIN_CONTENT_ID);
 }
 
-/* RSS feed */
-$data = Jojo::selectRow("SELECT * FROM {page}  WHERE pg_link='jojo_plugin_jojo_event_rss'");
-if (!count($data)) {
-    echo "Jojo_Plugin_Jojo_event: Adding <b>Event RSS</b> Page to menu<br />";
-    $data = Jojo::selectQuery("SELECT * FROM {page}  WHERE pg_link='jojo_plugin_jojo_event'");
-    foreach ($data as $d) {
-        Jojo::insertQuery("INSERT INTO {page} SET pg_title='Events RSS Feed', pg_link='jojo_plugin_jojo_event_rss', pg_url='events/rss', pg_parent = ?, pg_order=1, pg_mainnav='no'", array($d['pageid']));
-    }
-}
-
-/* Edit Event Categories */
+/* Edit Categories */
 $data = Jojo::selectRow("SELECT pg_url FROM {page} WHERE pg_url='admin/edit/eventcategory'");
 if (!count($data)) {
     $parent = Jojo::selectRow("SELECT pageid FROM {page} WHERE pg_url='admin/edit/event'");
-    echo "Jojo_Plugin_Jojo_event: Adding <b>Event Categories</b> Page to Edit Content menu<br />";
+    echo "Jojo_Plugin_Jojo_event: Adding <b>Event Page Options</b> Page to Edit Content menu<br />";
     Jojo::insertQuery("INSERT INTO {page} SET pg_title='Event Categories', pg_link='Jojo_Plugin_Admin_Edit', pg_url='admin/edit/eventcategory', pg_parent=?, pg_order=3", $parent['pageid']);
 }
 

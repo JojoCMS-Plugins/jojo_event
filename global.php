@@ -17,33 +17,29 @@
  */
 
 $numevents = Jojo::getOption('event_num_sidebar_events', 3);
+$get = $numevents +20;
 if ($numevents) {
-    $_CATEGORIES = (Jojo::getOption('event_enable_categories', 'no') == 'yes') ? true : false ;
-    $categories =  ($_CATEGORIES) ? Jojo::selectQuery("SELECT * FROM {eventcategory}") : array();
+    $categories =  Jojo::selectQuery("SELECT * FROM {eventcategory}");
     $exclude = (Jojo::getOption('event_sidebar_exclude_current', 'no')=='yes') ? true : false;
     /* Create latest item array for sidebar: getItems(x, start, categoryid, sortby, exclude) = list x# of events */
-    if ($_CATEGORIES && count($categories) && Jojo::getOption('event_sidebar_categories', 'no')=='yes') {
-        $smarty->assign('allevents', Jojo_Plugin_Jojo_event::getItems($numevents, 0, 'all', '', $exclude) );
+    if (count($categories) && Jojo::getOption('event_sidebar_categories', 'no')=='yes') {
+        $events =  Jojo_Plugin_Jojo_event::getItems($get, 0, 'all', '', $exclude);
+        $events = array_slice($events, 0, $numevents);
+        $smarty->assign('allevents', $events);
         foreach ($categories as $c) {
-            $smarty->assign('events_' . str_replace('-', '_', $c['ec_url']), Jojo_Plugin_Jojo_event::getItems($numevents, 0, $c['eventcategoryid'],  $c['sortby'], $exclude) );
+            $catevents = Jojo_Plugin_Jojo_event::getItems($get, 0, $c['eventcategoryid'],  $c['sortby'], $exclude);
+            $catevents = array_slice($catevents, 0, $numevents);
+            $smarty->assign('events_' . str_replace('-', '_', $catevents[0]['pg_url']),  $catevents);
         }
     } else {
         if (Jojo::getOption('event_sidebar_randomise', 0) > 0) {
-            $upcomingevents = Jojo_Plugin_Jojo_event::getItems(Jojo::getOption('event_sidebar_randomise', 0), 0, 'all', '', $exclude);
+            $upcomingevents = Jojo_Plugin_Jojo_event::getItems($get, 0, 'all', 'startdate asc', $exclude);
             shuffle($upcomingevents);
             $upcomingevents = array_slice($upcomingevents, 0, $numevents);
         } else {
-             $upcomingevents = Jojo_Plugin_Jojo_event::getItems($numevents, 0, 'all', '', $exclude);
+             $upcomingevents = Jojo_Plugin_Jojo_event::getItems($get, 0, 'all', 'startdate asc', $exclude);
+            $upcomingevents = array_slice($upcomingevents, 0, $numevents);
         }
         $smarty->assign('events', $upcomingevents );
-    }
-    /* Get the prefix for events (can vary for multiple installs) for use in the theme template instead of hard coding it */
-    $smarty->assign('eventshome', Jojo_Plugin_Jojo_event::_getPrefix('event', $page->getValue('pg_language')) );
-    if ($_CATEGORIES && count($categories) && Jojo::getOption('event_sidebar_categories', 'no')=='yes') {
-        foreach ($categories as $c) {
-            $category = $c['ec_url'];
-            $categoryid = $c['eventcategoryid'];
-            $smarty->assign('events_' . str_replace('-', '_', $category) . 'home', Jojo_Plugin_Jojo_event::_getPrefix('event', $page->getValue('pg_language'), $categoryid) );
-        }
     }
 }

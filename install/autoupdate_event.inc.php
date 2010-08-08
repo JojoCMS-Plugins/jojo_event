@@ -17,18 +17,29 @@
  * @link    http://www.jojocms.org JojoCMS
  */
 
+if (!defined('_MULTILANGUAGE')) {
+    define('_MULTILANGUAGE', Jojo::getOption('multilanguage', 'no') == 'yes');
+}
+
+$default_td['event'] = array(
+        'td_name' => "event",
+        'td_primarykey' => "eventid",
+        'td_displayfield' => "title",
+        'td_categorytable' => "eventcategory",
+        'td_categoryfield' => "category",
+        'td_rolloverfield' => "",
+        'td_filter' => "yes",
+        'td_orderbyfields' => "startdate asc",
+        'td_topsubmit' => "yes",
+        'td_deleteoption' => "yes",
+        'td_menutype' => "tree",
+        'td_help' => "News events are managed from here. Depending on the exact configuration, the most recent 5 events may be shown on the homepage or sidebar, or they may be listed only on the news page. All News events have their own \"full info\" page, which has a unique URL for the search engines. This is based on the title of the event, so please do not change the title of an event unless absolutely necessary, as the PageRank of the event may suffer. The system will comfortably take many hundreds of events, but you may want to manually delete anything that is no longer relevant, or correct.",
+        'td_languagefield' => "language",
+        'td_plugin' => "Jojo_event",
+    );
+
 $table = 'event';
 $o = 1;
-
-$default_td[$table]['td_displayfield']  = 'title';
-$default_td[$table]['td_rolloverfield'] = '';
-$default_td[$table]['td_orderbyfields'] = 'startdate, title';
-$default_td[$table]['td_topsubmit']     = 'yes';
-$default_td[$table]['td_deleteoption']  = 'yes';
-$default_td[$table]['td_menutype']      = 'tree';
-$default_td[$table]['td_categoryfield'] = 'category';
-$default_td[$table]['td_categorytable'] = 'eventcategory';
-$default_td[$table]['td_help']          = '';
 
 /* Event ID */
 $field = 'eventid';
@@ -110,8 +121,8 @@ $default_fd[$table][$field]['fd_size']     = '50';
 $default_fd[$table][$field]['fd_help']     = 'The event location map link';
 $default_fd[$table][$field]['fd_tabname'] = "Content";
 
-/* URL */
-$field = 'url';
+/* Website */
+$field = 'website';
 $default_fd[$table][$field]['fd_order']    = $o++;
 $default_fd[$table][$field]['fd_type']     = 'url';
 $default_fd[$table][$field]['fd_name']     = 'More info link';
@@ -227,12 +238,23 @@ $default_fd[$table]['language'] = array(
         'fd_tabname' => "Content",
     );
 
+
+/* Url */
+$field = 'url';
+$default_fd[$table][$field]['fd_order']    = $o++;
+$default_fd[$table][$field]['fd_type']     = 'hidden';
+$default_fd[$table][$field]['fd_required'] = 'no';
+$default_fd[$table][$field]['fd_size']     = '30';
+$default_fd[$table][$field]['fd_help']     = 'custom url for this event';
+$default_fd[$table][$field]['fd_tabname'] = "Content";
+
+
 //Timestamp
 $default_fd[$table]['dateadded'] = array(
         'fd_order' => $o++,
         'fd_required' => 'no',
         'fd_type' => "unixdate",
-        'fd_default' => 'NOW()',
+        'fd_default' => 'now',
         'fd_help' => '',
         'fd_tabname' => "Content",
     );
@@ -265,24 +287,52 @@ $default_fd[$table]['tags'] = array(
 
 /* Category */
 
+$default_td['eventcategory'] = array(
+        'td_name' => "eventcategory",
+        'td_primarykey' => "eventcategoryid",
+        'td_displayfield' => "pageid",
+        'td_filter' => "yes",
+        'td_topsubmit' => "yes",
+        'td_addsimilar' => "no",
+        'td_deleteoption' => "yes",
+        'td_menutype' => "list",
+        'td_help' => "New event page's options are managed from here.",
+        'td_plugin' => "Jojo_event",
+    );
+
+
 // ID Field
 $default_fd['eventcategory']['eventcategoryid'] = array(
         'fd_name' => "Categoryid",
-        'fd_type' => "readonly",
+        'fd_type' => "integer",
+        'fd_readonly' => "1",
         'fd_help' => "A unique ID, automatically assigned by the system",
-        'fd_order' => "1",
+        'fd_order' => "0",
         'fd_tabname' => "Content",
         'fd_mode' => "advanced",
+    );
+
+// Page Field
+$default_fd['eventcategory']['pageid'] = array(
+        'fd_name' => "Page",
+        'fd_type' => "dbpluginpagelist",
+        'fd_options' => "jojo_plugin_jojo_event",
+        'fd_readonly' => "1",
+        'fd_default' => "1",
+        'fd_help' => "The page on the site used for this category.",
+        'fd_order' => $o++,
+        'fd_tabname' => "Content",
     );
 
 // URL Field
 $default_fd['eventcategory']['ec_url'] = array(
         'fd_name' => "URL",
         'fd_type' => "internalurl",
-        'fd_required' => "yes",
+        'fd_readonly' => "2",
+        'fd_required' => "no",
         'fd_size' => "60",
         'fd_help' => "URL for the Event Category. This will be used for the base URL for all events in this category. The Page url for this category's home page MUST match the category URL.",
-        'fd_order' => "2",
+        'fd_order' => $o++,
         'fd_tabname' => "Content",
     );
 
@@ -292,16 +342,27 @@ $default_fd['eventcategory']['sortby'] = array(
         'fd_type' => "radio",
         'fd_options' => "title asc:Title\nstartdate asc:Event Start Date\nenddate asc:Event End Date",
         'fd_default' => "startdate asc",
-        'fd_order' => "3",
+        'fd_order' => $o++,
         'fd_tabname' => "Content",
     );
 
-// PageID Field
-$default_fd['eventcategory']['ec_pageid'] = array(
-        'fd_name' => "PageID",
-        'fd_type' => "hidden",
-        'fd_required' => "no",
-        'fd_help' => "The page id for the page used for this category.",
-        'fd_order' => "4",
+// Thumbnail sizing Field
+$default_fd['eventcategory']['thumbnail'] = array(
+        'fd_name' => "Thumbnail sizing",
+        'fd_type' => "text",
+        'fd_readonly' => "0",
+        'fd_default' => "s150",
+        'fd_help' => "image thumbnail sizing in index eg: 150x200, h200, v4000",
+        'fd_order' => $o++,
+        'fd_tabname' => "Content",
+    );
+
+// Show Rss link Field
+$default_fd['eventcategory']['rsslink'] = array(
+        'fd_name' => "Publish to Rss",
+        'fd_type' => "yesno",
+        'fd_readonly' => "0",
+        'fd_default' => "1",
+        'fd_order' => $o++,
         'fd_tabname' => "Content",
     );

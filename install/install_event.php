@@ -17,6 +17,8 @@
  * @link    http://www.jojocms.org JojoCMS
  */
 
+$updatefield = (boolean)(Jojo::tableExists('event') && !Jojo::fieldExists('event', 'website'));
+
 $table = 'event';
 $query = "
         CREATE TABLE {event} (
@@ -33,6 +35,7 @@ $query = "
   `snippet` text NOT NULL,
   `description` text NOT NULL,
   `description_code` text NULL,
+  `website` varchar(255) default NULL,
   `event_image` varchar(255) NOT NULL,
   `url` varchar(255) default NULL,
   `category` int(11) default NULL,  
@@ -62,6 +65,13 @@ if (isset($result['added'])) {
 
 if (isset($result['different'])) Jojo::printTableDifference($table,$result['different']);
 
+if ($updatefield) {
+ $events = Jojo::selectQuery("SELECT eventid, url FROM {event}");
+     foreach ($events as $e) {
+        Jojo::updateQuery("UPDATE {event} SET website = ?, url='' WHERE eventid = ?", array($e['url'], $e['eventid']));
+     }
+     Jojo::structureQuery("ALTER TABLE  {eventcategory} CHANGE  `ec_pageid`  `pageid` INT( 11 ) NOT NULL DEFAULT  '0'");
+}
 
 $table = 'eventcategory';
 $query = "
@@ -69,8 +79,11 @@ $query = "
       `eventcategoryid` int(11) NOT NULL auto_increment,
       `ec_url` varchar(255) NOT NULL default '',
       `sortby` enum('title asc','startdate asc','enddate asc') NOT NULL default 'startdate asc',
-      `ec_pageid` int(11) NOT NULL default '0',
-      PRIMARY KEY  (`eventcategoryid`)
+      `pageid` int(11) NOT NULL default '0',
+      `rsslink` tinyint(1) default '1',
+      `thumbnail` varchar(255) NOT NULL default '',
+      PRIMARY KEY  (`eventcategoryid`),
+      KEY `id` (`pageid`)
     ) TYPE=MyISAM ;";
 
 /* Check table structure */
