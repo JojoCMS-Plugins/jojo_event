@@ -3,7 +3,7 @@
   <h3>{$event.title}</h3>
     {if $event.event_image}<a href="images/default/events/{$event.event_image}" rel="lightbox" title="full size image"><img src="images/v12000/events/{$event.event_image}" class="float-right" alt="{$event.title}" /></a>{/if}
     <p class="date">
-    {$event.fstartdate}{if $event.starttime} at {$event.starttime} {/if}{if $event.enddate && $event.enddate != $event.startdate} - {$event.fenddate}{/if}
+    {$event.fstartdate}{if $event.starttime} at {$event.starttime} {/if}{if $event.fenddate && $event.fenddate != $event.fstartdate} - {$event.fenddate}{/if}
     {if $event.location}<br />{$event.location} {if $event.locationurl}<span class="note">(<a href="{$event.locationurl}" title="{$event.location} website" >{str_replace('http://', '', rtrim($event.locationurl, '/'))}</a>)</span>{/if}    {/if}
     {if $event.locationaddress}<br />{$event.locationaddress}{/if}
     {if $event.locationmaplink} <span class="note">- <a href="{$event.locationmaplink}" title="Google map">See Google map</a></span>{/if}
@@ -14,8 +14,6 @@
     <div id="event-bottomlinks">
         <p class="links">&lt;&lt; <a href="{if $multilangstring}{$multilangstring}{/if}{if $pg_url}{$pg_url}/{else}{$pageid}/{$pg_title|strtolower}{/if}" title="{$pg_title}">{$pg_title}</a>&nbsp; {if $prevevent}&lt; <a href="{$prevevent.url}" title="Previous">{$prevevent.title}</a>{/if}{if $nextevent} | <a href="{$nextevent.url}" title="Next">{$nextevent.title}</a> &gt;{/if}</p>
     </div>
-
-
 {elseif $events}
 {assign var=prev value=""}
 {foreach from=$events item=event}
@@ -26,7 +24,7 @@
   <h3>{$event.title}</h3>
     {if $event.event_image}<a href="images/default/events/{$event.event_image}" rel="lightbox" title="full size image"><img src="images/v12000/events/{$event.event_image}" class="float-right" alt="{$event.title}" /></a>{/if}
     <p class="date">
-    {$event.fstartdate}{if $event.starttime} at {$event.starttime} {/if}{if $event.enddate && $event.enddate != $event.startdate} - {$event.fenddate}{/if}
+    {$event.fstartdate}{if $event.starttime} at {$event.starttime} {/if}{if $event.fenddate && $event.fenddate != $event.fstartdate} - {$event.fenddate}{/if}
     {if $event.location}<br />{$event.location} {if $event.locationurl}<span class="note">(<a href="{$event.locationurl}" title="{$event.location} website" >{str_replace('http://', '', rtrim($event.locationurl, '/'))}</a>)</span>{/if}    {/if}
     {if $event.locationaddress}<br />{$event.locationaddress}{/if}
     {if $event.locationmaplink} <span class="note">- <a href="{$event.locationmaplink}" title="Google map">See Google map</a></span>{/if}
