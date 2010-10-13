@@ -163,7 +163,7 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
     {
         global $smarty;
         $content = array();
-        
+
         if (_MULTILANGUAGE) {
             $language = !empty($this->page['pg_language']) ? $this->page['pg_language'] : Jojo::getOption('multilanguage-default', 'en');
             $multilangstring = Jojo::getMultiLanguageString($language, false);
@@ -188,7 +188,7 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
             $categoryid = $categorydata['eventcategoryid'];
         }
         $sortby = $categorydata ? $categorydata['sortby'] : '';
-        
+
         $events = self::getItems('', '', $categoryid, $sortby);
 
         if ($action == 'rss') {
@@ -203,8 +203,8 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
             );
             $events = array_slice($events, 0, Jojo::getOption('rss_num_items', 15));
             Jojo::getFeed($events, $rssfields);
-        }        
-        
+        }
+
         if ($id) {
 
             /* find the current, next and previous profiles */
@@ -277,13 +277,13 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
             $meta_description_template = Jojo::getOption('event_meta_description', '[title] - [body]...');
             $metabody = (strlen($event['bodyplain']) >400) ?  substr($mbody=wordwrap($event['bodyplain'], 400, '$$'), 0, strpos($mbody,'$$')) : $event['bodyplain'];
             $metafilters = array(
-                    '[title]', 
-                    '[site]', 
+                    '[title]',
+                    '[site]',
                     '[body]'
                     );
             $metafilterreplace = array(
-                    $event['title'], 
-                    _SITETITLE, 
+                    $event['title'],
+                    _SITETITLE,
                     $metabody
                     );
             $content['meta_description'] = str_replace($metafilters, $metafilterreplace, $meta_description_template);
@@ -297,7 +297,7 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
                 if ($pagenum[0] == 'p') {
                     $pagenum = substr($pagenum, 1);
                 }
-                $smarty->assign('event','');    
+                $smarty->assign('event','');
                 /* get number of events for pagination */
                 $eventsperpage = Jojo::getOption('eventsperpage', 40);
                 $start = ($eventsperpage * ($pagenum-1));
@@ -517,7 +517,7 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
                 0,  // Parent - don't do anything smart, just put it at the top level for now
                 'hidden' // hide new page so it doesn't show up on the live site until it's been given a proper title and url
             )
-        );        
+        );
         // If we successfully added the page, update the category with the new pageid
         if ($newpageid) {
             jojo::updateQuery(
@@ -542,7 +542,7 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
            $pageid = $page['pageid'];
         }
         // no category for this page id
-        if (!count($categories) || !isset($categories[$pageid])) { 
+        if (!count($categories) || !isset($categories[$pageid])) {
             jojo::insertQuery("INSERT INTO {eventcategory} (pageid) VALUES ('$pageid')");
         }
         return true;
@@ -556,7 +556,7 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
         if (!count($indexes)) {
             return $sitemap;
         }
-        
+
         if (Jojo::getOption('event_inplacesitemap', 'separate') == 'separate') {
             /* Remove any existing links to the events section from the page listing on the sitemap */
             foreach($sitemap as $j => $section) {
@@ -691,7 +691,7 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
     static function xmlsitemap($sitemap)
     {
         /* Get events from database */
-        $events = self::getevents('', '', 'all', '', '', 'alllanguages');
+        $events = self::getItems('', '', 'all', '', '', 'alllanguages');
         $now = time();
         $indexes =  self::getPluginPages('xmlsitemap');
         $ids=array();
