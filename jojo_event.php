@@ -760,7 +760,7 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
             'primaryfields' => 'title',
             'secondaryfields' => 'title, location, description',
         );
-        $rawresults =  Jojo_Plugin_Jojo_search::searchPlugin($searchfields, $keywords, $language, $booleankeyword_str=false);
+        $rawresults =  Jojo_Plugin_Jojo_search::searchPlugin($searchfields, $keywords, $language, $booleankeyword_str);
         $data = $rawresults ? self::getItemsById(array_keys($rawresults)) : '';
         if ($data) {
             foreach ($data as $result) {
