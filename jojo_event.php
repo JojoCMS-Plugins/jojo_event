@@ -79,6 +79,7 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
             $i['fstartdate'] = strftime( Jojo::getOption('upcomingevents_dateformat', '%d %b'), $i['startdate']);
             $i['fenddate'] = strftime( Jojo::getOption('upcomingevents_dateformat', '%d %b'), $i['enddate']);
             $i['image'] = !empty($i['event_image']) ? 'events/' . $i['event_image'] : '';
+            $i['imagedata'] = !empty($i['event_image']) ? getimagesize(_DOWNLOADDIR . '/events/' . $i['event_image']) : '';
             $i['url']          = self::getUrl($i['eventid'], '', $i['title'], $i['language'], $i['category']);
             $i['date']       = $i['dateadded'];
             $i['pagetitle'] = !empty($i['pg_menutitle']) ? htmlspecialchars($i['pg_menutitle'], ENT_COMPAT, 'UTF-8', false) : htmlspecialchars($i['pg_title'], ENT_COMPAT, 'UTF-8', false);
