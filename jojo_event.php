@@ -46,13 +46,13 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
         return $items;
     }
 
-    static function getItemsById($ids = false, $sortby='startdate') {
+    static function getItemsById($ids = false, $sortby='startdate', $exclude=false) {
         $query  = "SELECT e.*, c.*, p.pageid, pg_menutitle, pg_title, pg_url, pg_status, pg_language";
         $query .= " FROM {event} e";
         $query .= " LEFT JOIN {eventcategory} c ON (e.category=c.eventcategoryid) LEFT JOIN {page} p ON (c.pageid=p.pageid)";
         $query .=  is_array($ids) ? " WHERE eventid IN ('". implode("',' ", $ids) . "')" : " WHERE eventid=$ids";
         $items = Jojo::selectQuery($query);
-        $items = self::cleanItems($items);
+        $items = self::cleanItems($items, $exclude);
         $items = is_array($ids) ? self::sortItems($items, $sortby) : $items[0];
         return $items;
     }
@@ -774,6 +774,33 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
         }
         /* Return results */
         return $results;
+    }
+
+    /**
+     * Newsletter content
+     */
+    static function newslettercontent($contentarray, $newletterid=false)
+    {
+        /* Get all the events for this newsletter */
+        if ($newletterid) {
+            $eventids = Jojo::selectAssoc('SELECT n.order, e.eventid FROM {event} e, {newsletter_event} n WHERE e.eventid = n.eventid AND n.newsletterid = ? ORDER BY n.order', $newletterid);
+            if ($eventids) {
+                $events = self::getItemsById($eventids, '', 'showhidden');
+                foreach($events as &$a) {
+                    $a['title'] = mb_convert_encoding($a['title'], 'HTML-ENTITIES', 'UTF-8');
+                    $a['bodyplain'] = mb_convert_encoding($a['bodyplain'], 'HTML-ENTITIES', 'UTF-8');
+                    $a['body'] = mb_convert_encoding($a['description'], 'HTML-ENTITIES', 'UTF-8');
+                   $a['imageurl'] = rawurlencode($a['image']);
+                    foreach ($eventids as $k => $i) {
+                        if ($i==$a['eventid']) {
+                            $contentarray['events'][$k] = $a;
+                        }
+                    }
+                }
+            }
+        }
+        /* Return results */
+        return $contentarray;
     }
 
 /*

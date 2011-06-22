@@ -366,3 +366,20 @@ $default_fd['eventcategory']['rsslink'] = array(
         'fd_order' => $o++,
         'fd_tabname' => "Content",
     );
+
+/* add many to many table for use by newsletter plugin if present */
+if (class_exists('Jojo_Plugin_Jojo_Newsletter')) {
+$default_fd['newsletter']['events'] = array(
+        'fd_name' => "Events To Include",
+        'fd_type' => "many2manyordered",
+        'fd_size' => "0",
+        'fd_rows' => "0",
+        'fd_cols' => "0",
+        'fd_showlabel' => "no",
+        'fd_tabname' => "2. Events",
+        'fd_m2m_linktable' => "newsletter_event",
+        'fd_m2m_linkitemid' => "newsletterid",
+        'fd_m2m_linkcatid' => "eventid",
+        'fd_m2m_cattable' => "event",
+    );
+}

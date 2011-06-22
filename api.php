@@ -28,6 +28,11 @@ Jojo::addFilter('jojo_xml_sitemap', 'xmlsitemap', 'jojo_event');
 if (class_exists('Jojo_Plugin_Jojo_search')) {
     Jojo::addFilter('jojo_search', 'search', 'jojo_event');
 }
+/* Newsletter content Filter */
+if (class_exists('Jojo_Plugin_Jojo_Newsletter') && Jojo::tableExists('newsletter_event')) {
+    Jojo::addFilter('jojo_newslettercontent', 'newslettercontent', 'jojo_event');
+}
+
 /*  RSS icon filter */
 Jojo::addFilter('rssicon', 'rssicon', 'jojo_event');
 
