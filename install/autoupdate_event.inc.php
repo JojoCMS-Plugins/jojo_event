@@ -164,6 +164,16 @@ $default_fd['event']['enddate'] = array(
         'fd_tabname' => "Content",
     );
 
+// Full
+$default_fd['event']['full'] = array(
+        'fd_name' => "Event Full",
+        'fd_type' => "yesno",
+        'fd_readonly' => "0",
+        'fd_default' => "0",
+        'fd_order' => $o++,
+        'fd_tabname' => "Content",
+    );
+
 /* Event Location */
 $field = 'starttime';
 $default_fd[$table][$field]['fd_order']    = $o++;

@@ -42,6 +42,7 @@ $query = "
   `language` varchar(100) NOT NULL default 'en',
   `seotitle` varchar(255) NOT NULL default '',
   `dateadded` int(11) default '0',
+  `full` tinyint(1) default '0',
   `tags` varchar(10) default NULL,
   PRIMARY KEY  (`eventid`),
   KEY `date` (`startdate`),
