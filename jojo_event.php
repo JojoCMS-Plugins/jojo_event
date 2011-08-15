@@ -797,6 +797,7 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
                         }
                     }
                 }
+                ksort($contentarray['events']);
             }
         }
         /* Return results */
