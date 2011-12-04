@@ -39,7 +39,8 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
         $query .= " WHERE 1" . $categoryquery;
         $query .= " AND enddate>$now";
         $query .= (_MULTILANGUAGE && $categoryid == 'all' && $include != 'alllanguages') ? " AND (pg_language = '$language')" : '';
-        $query .= $num ? " ORDER BY $sortby LIMIT $start,$num" : '';
+        $query .= $sortby ? " ORDER BY $sortby" : '';
+        $query .= $num ? " LIMIT $start, $num" : '';
         $items = Jojo::selectQuery($query);
         $items = self::cleanItems($items, $exclude);
         if (!$num)  $items = self::sortItems($items, $sortby);

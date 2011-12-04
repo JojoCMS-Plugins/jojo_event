@@ -19,13 +19,13 @@
 $numevents = Jojo::getOption('event_num_sidebar_events', 3);
 $get = $numevents +20;
 if ($numevents) {
-    $categories =  Jojo::selectQuery("SELECT * FROM {eventcategory}");
     $exclude = (Jojo::getOption('event_sidebar_exclude_current', 'no')=='yes') ? true : false;
     /* Create latest item array for sidebar: getItems(x, start, categoryid, sortby, exclude) = list x# of events */
-    if (count($categories) && Jojo::getOption('event_sidebar_categories', 'no')=='yes') {
+    if (Jojo::getOption('event_sidebar_categories', 'no')=='yes') {
         $events =  Jojo_Plugin_Jojo_event::getItems($get, 0, 'all', '', $exclude);
         $events = array_slice($events, 0, $numevents);
         $smarty->assign('allevents', $events);
+        $categories =  Jojo::selectQuery("SELECT * FROM {eventcategory}");
         foreach ($categories as $c) {
             $catevents = Jojo_Plugin_Jojo_event::getItems($get, 0, $c['eventcategoryid'],  $c['sortby'], $exclude);
             $catevents = array_slice($catevents, 0, $numevents);
