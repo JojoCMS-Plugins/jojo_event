@@ -28,8 +28,10 @@ if ($numevents) {
         $categories =  Jojo::selectQuery("SELECT * FROM {eventcategory}");
         foreach ($categories as $c) {
             $catevents = Jojo_Plugin_Jojo_event::getItems($get, 0, $c['eventcategoryid'],  $c['sortby'], $exclude);
-            $catevents = array_slice($catevents, 0, $numevents);
-            $smarty->assign('events_' . str_replace('-', '_', $catevents[0]['pg_url']),  $catevents);
+            if ($catevents) {
+                $catevents = array_slice($catevents, 0, $numevents);
+                $smarty->assign('events_' . str_replace('-', '_', $catevents[0]['pg_url']),  $catevents);
+            }
         }
     } else {
         if (Jojo::getOption('event_sidebar_randomise', 0) > 0) {
