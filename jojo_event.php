@@ -784,15 +784,29 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
     {
         /* Get all the events for this newsletter */
         if ($newletterid) {
-            $eventids = Jojo::selectAssoc('SELECT n.order, e.eventid FROM {event} e, {newsletter_event} n WHERE e.eventid = n.eventid AND n.newsletterid = ? ORDER BY n.order', $newletterid);
-            if ($eventids) {
-                $events = self::getItemsById($eventids, '', 'showhidden');
-                foreach($events as &$a) {
+            $itemids = Jojo::selectQuery('SELECT e.eventid FROM {event} e, {newsletter_event} n WHERE e.eventid = n.eventid AND n.newsletterid = ? ORDER BY n.order, e.startdate DESC', $newletterid);
+            if ($itemids) {
+                foreach ($itemids as $i) {
+                    $ids[] = $i['eventid'];
+                }
+                $items = self::getItemsById($ids, '', 'showhidden');
+                $css = Jojo::getOption('newslettercss', '');
+                $newscss = array();
+                if ($css) {
+                    $styles = explode("\n", $css);
+                    foreach ($styles as $k => $s) {
+                        $style = explode('=', $s);
+                        $newscss[$k]['tag'] = $style[0];
+                        $newscss[$k]['style'] = $style[1];
+                    }
+                }
+                $contentarray['events'] = array();
+                foreach($items as &$a) {
                     $a['title'] = mb_convert_encoding($a['title'], 'HTML-ENTITIES', 'UTF-8');
                     $a['bodyplain'] = mb_convert_encoding($a['bodyplain'], 'HTML-ENTITIES', 'UTF-8');
-                    $a['body'] = mb_convert_encoding($a['description'], 'HTML-ENTITIES', 'UTF-8');
-                   $a['imageurl'] = rawurlencode($a['image']);
-                    foreach ($eventids as $k => $i) {
+                    $a['body'] = mb_convert_encoding(Jojo::inlineStyle($a['description'], $newscss), 'HTML-ENTITIES', 'UTF-8');
+                    $a['imageurl'] = rawurlencode($a['image']);
+                    foreach ($ids as $k => $i) {
                         if ($i==$a['eventid']) {
                             $contentarray['events'][$k] = $a;
                         }
