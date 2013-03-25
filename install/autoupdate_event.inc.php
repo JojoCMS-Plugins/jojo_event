@@ -174,6 +174,16 @@ $default_fd['event']['full'] = array(
         'fd_tabname' => "Content",
     );
 
+// Cancelled
+$default_fd['event']['cancelled'] = array(
+        'fd_name' => "Event Cancelled",
+        'fd_type' => "yesno",
+        'fd_readonly' => "0",
+        'fd_default' => "0",
+        'fd_order' => $o++,
+        'fd_tabname' => "Content",
+    );
+
 /* Event Location */
 $field = 'starttime';
 $default_fd[$table][$field]['fd_order']    = $o++;
@@ -268,8 +278,8 @@ $default_fd[$table]['dateadded'] = array(
         'fd_help' => '',
         'fd_tabname' => "Content",
     );
-    
-    
+
+
 /* Tags Tab */
 if (class_exists('Jojo_Plugin_Jojo_Tags')) {
 // Tags Field

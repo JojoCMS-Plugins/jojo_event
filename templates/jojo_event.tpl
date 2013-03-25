@@ -1,6 +1,6 @@
 {if $pg_body && (!$pagenum || $pagenum==1) && !$event}{$pg_body}{/if}
 {if $event}
-  <h3>{$event.title}{if $event.full} <span>##Full!##</span>{/if}</h3>
+  <h3>{$event.title}{if $event.full} <span>##Full!##</span>{elseif $event.cancelled} <span class="important">##Cancelled##</span>{/if}</h3>
     {if $event.event_image}<a href="images/default/events/{$event.event_image}" rel="lightbox" title="full size image"><img src="images/v12000/events/{$event.event_image}" class="float-right" alt="{$event.title}" /></a>{/if}
     <p class="date">
     {$event.fstartdate}{if $event.starttime} ##at## {$event.starttime} {/if}{if $event.fenddate && $event.fenddate != $event.fstartdate} - {$event.fenddate}{/if}
@@ -24,7 +24,7 @@
 <h2>{$prev}</h2>
 {/if}
 <div class="event">
-  <h3>{$event.title}{if $event.full} <span class="full">##Full!##</span>{/if}</h3>
+  <h3>{$event.title}{if $event.full} <span class="full">##Full!##</span>{elseif $event.cancelled} <span class="important">##Cancelled##</span>{/if}</h3>
     {if $event.event_image}<a href="images/default/events/{$event.event_image}" rel="lightbox" title="full size image"><img src="images/v12000/events/{$event.event_image}" class="float-right" alt="{$event.title}" /></a>{/if}
     <p class="date">
     {$event.fstartdate}{if $event.starttime} at {$event.starttime} {/if}{if $event.fenddate && $event.fenddate != $event.fstartdate} - {$event.fenddate}{/if}{if !$event.full}
@@ -34,8 +34,8 @@
     {if $event.cost}<br />Cost: {$event.cost}{/if}{/if}
     </p>
    {$event.description}
-    {if $event.website && !$event.full}<p class="note">##For more info see##: <a href="{$event.website}">{$event.website|truncate:50}</a></p>{/if}
-    {if $event.contactemail && !$event.full}<p class="note"><a href="mailto:{$event.contactemail}?subject={str_replace(' ', '%20', $event.title)}%20{str_replace(' ', '%20', $event.fstartdate)}">##Contact us for bookings or more information##</a></p>{/if}
+    {if $event.website && !$event.full && !$event.cancelled}<p class="note">##For more info see##: <a href="{$event.website}">{$event.website|truncate:50}</a></p>{/if}
+    {if $event.contactemail && !$event.full && !$event.cancelled}<p class="note"><a href="mailto:{$event.contactemail}?subject={str_replace(' ', '%20', $event.title)}%20{str_replace(' ', '%20', $event.fstartdate)}">##Contact us for bookings or more information##</a></p>{/if}
 </div>
 {/foreach}
 {else}

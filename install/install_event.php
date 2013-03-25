@@ -38,11 +38,12 @@ $query = "
   `website` varchar(255) default NULL,
   `event_image` varchar(255) NOT NULL,
   `url` varchar(255) default NULL,
-  `category` int(11) default NULL,  
+  `category` int(11) default NULL,
   `language` varchar(100) NOT NULL default 'en',
   `seotitle` varchar(255) NOT NULL default '',
   `dateadded` int(11) default '0',
   `full` tinyint(1) default '0',
+  `cancelled` tinyint(1) default '0',
   `tags` varchar(10) default NULL,
   PRIMARY KEY  (`eventid`),
   KEY `date` (`startdate`),
@@ -111,23 +112,23 @@ if (class_exists('Jojo_Plugin_Jojo_Newsletter')) {
       `eventid` int(11) NOT NULL,
       `order` int(11) NOT NULL
     );";
-    
+
     /* Check table structure */
     $result = Jojo::checkTable($table, $query);
-    
+
     /* Output result */
     if (isset($result['created'])) {
         echo sprintf("jojo_newsletter_phplist: Table <b>%s</b> Does not exist - created empty table.<br />", $table);
     }
-    
+
     if (isset($result['added'])) {
         foreach ($result['added'] as $col => $v) {
             echo sprintf("jojo_newsletter_phplist: Table <b>%s</b> column <b>%s</b> Does not exist - added.<br />", $table, $col);
         }
     }
-    
+
     if (isset($result['different'])) Jojo::printTableDifference($table,$result['different']);
-        
+
     /* add the new events field to the newsletter table if it does not exist */
     if (Jojo::tableExists('newsletter') && !Jojo::fieldExists('newsletter', 'events')) {
         Jojo::structureQuery("ALTER TABLE `newsletter` ADD `events` TEXT NOT NULL;");
