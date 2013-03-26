@@ -73,7 +73,8 @@ class Jojo_Plugin_Jojo_event extends Jojo_Plugin
             $i['title']        = htmlspecialchars($i['title'], ENT_COMPAT, 'UTF-8', false);
             $i['seotitle']        = isset($i['seotitle']) ? htmlspecialchars($i['seotitle'], ENT_COMPAT, 'UTF-8', false): $i['title'];
             // Snip for the index description
-            $i['bodyplain'] = array_shift(Jojo::iExplode('[[snip]]', $i['description']));
+            $splitcontent = Jojo::iExplode('[[snip]]', $i['description']);
+            $i['bodyplain'] = array_shift($splitcontent);
             /* Strip all tags and template include code ie [[ ]] */
             $i['bodyplain'] = preg_replace('/\[\[.*?\]\]/', '',  trim(strip_tags($i['bodyplain'])));
             $i['locationmaplink']    = htmlspecialchars($i['locationmaplink'], ENT_COMPAT, 'UTF-8', false);
