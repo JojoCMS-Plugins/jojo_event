@@ -49,7 +49,7 @@ $query = "
   KEY `date` (`startdate`),
       FULLTEXT KEY `title` (`title`),
       FULLTEXT KEY `body` (`title`, `description`, `location`)
-         );";
+         ) ENGINE=MyISAM  DEFAULT CHARSET=utf8;";
 
 /* Check table structure */
 $result = Jojo::checkTable($table, $query);
@@ -86,7 +86,7 @@ $query = "
       `thumbnail` varchar(255) NOT NULL default '',
       PRIMARY KEY  (`eventcategoryid`),
       KEY `id` (`pageid`)
-    ) TYPE=MyISAM ;";
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
 
 /* Check table structure */
 $result = Jojo::checkTable($table, $query);
